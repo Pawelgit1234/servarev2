@@ -1,0 +1,37 @@
+[project]
+name = "servarev2"
+version = "0.1.0"
+description = "Minecraft server scanner"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "mypy>=1.20.0",
+    "pre-commit>=4.5.1",
+    "ruff>=0.15.8",
+]
+
+# ---------- Ruff ----------
+
+[tool.ruff]
+line-length = 79
+target-version = "py312"
+lint.select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ---------- Mypy ----------
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+warn_return_any = true
+warn_unused_ignores = true
+pretty = true
+show_error_codes = true
+explicit_package_bases = true
