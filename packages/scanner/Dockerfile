@@ -18,6 +18,8 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir uv
 
+COPY packages/scanner/exclude.conf ./
+
 COPY pyproject.toml uv.lock ./
 COPY packages/common ./packages/common
 COPY packages/scanner ./packages/scanner
