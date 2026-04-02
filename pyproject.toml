@@ -6,12 +6,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
 
-[dependency-groups]
-dev = [
-    "mypy>=1.20.0",
-    "pre-commit>=4.5.1",
-    "ruff>=0.15.8",
-]
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+common = { workspace = true }
 
 # ---------- Ruff ----------
 

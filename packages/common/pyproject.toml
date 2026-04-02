@@ -1,0 +1,14 @@
+[project]
+name = "common"
+version = "0.1.0"
+description = "Common functionality for other packages"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+common = "common:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
