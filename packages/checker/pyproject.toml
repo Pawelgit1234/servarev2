@@ -1,15 +1,15 @@
 [project]
-name = "common"
+name = "checker"
 version = "0.1.0"
-description = "Common functionality for other packages"
+description = "Check ips found by scanner"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "redis>=7.4.0",
+    "common"
 ]
 
 [project.scripts]
-common = "common:main"
+checker = "checker:main"
 
 [build-system]
 requires = ["hatchling"]

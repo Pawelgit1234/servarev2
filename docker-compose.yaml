@@ -10,15 +10,24 @@ services:
     depends_on:
       - db
       - redis
-    network_mode: host
-    cap_add:
-    - NET_RAW
-    - NET_ADMIN
     deploy:
       resources:
         limits:
           cpus: "1.0"
           memory: 512M
+  
+  checker:
+    build:
+      context: .
+      dockerfile: packages/checker/Dockerfile
+    container_name: checker
+    restart: no
+    environment:
+      - CHECK_CONCURRENCY=${CHECK_CONCURRENCY}
+    depends_on:
+      - db
+      - redis
+      - scanner
   
   db:
     image: postgres:18.3-alpine

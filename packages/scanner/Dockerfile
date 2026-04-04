@@ -30,4 +30,4 @@ RUN uv sync --frozen --package scanner --no-dev
 
 COPY --from=builder /masscan/bin/masscan /usr/local/bin/masscan
 
-CMD ["uv", "run", "--package", "scanner", "python", "-m", "scanner.main"]
+CMD ["uv", "run", "--package", "scanner", "python", "-u", "-m", "scanner.main"]

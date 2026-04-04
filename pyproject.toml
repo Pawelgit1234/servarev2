@@ -12,6 +12,14 @@ members = ["packages/*"]
 [tool.uv.sources]
 common = { workspace = true }
 
+[dependency-groups]
+dev = [
+    "ruff",
+    "mypy",
+    "pre-commit",
+    "types-redis>=4.6.0.20241004",
+]
+
 # ---------- Ruff ----------
 
 [tool.ruff]
@@ -34,3 +42,4 @@ warn_unused_ignores = true
 pretty = true
 show_error_codes = true
 explicit_package_bases = true
+

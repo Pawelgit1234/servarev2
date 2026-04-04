@@ -3,6 +3,7 @@ repos:
     rev: v0.15.8
     hooks:
       - id: ruff-check
+        args: [--fix]
         files: \.py$
       - id: ruff-format
         files: \.py$
@@ -11,3 +12,5 @@ repos:
     rev: v1.8.0
     hooks:
       - id: mypy
+        additional_dependencies:
+          - types-redis
