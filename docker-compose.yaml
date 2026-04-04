@@ -23,11 +23,27 @@ services:
     container_name: checker
     restart: no
     environment:
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
       - CHECK_CONCURRENCY=${CHECK_CONCURRENCY}
     depends_on:
       - db
       - redis
       - scanner
+  
+  migrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrations
+    environment:
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+    volumes:
+    - ./alembic:/app/alembic
+    depends_on:
+      - db
   
   db:
     image: postgres:18.3-alpine

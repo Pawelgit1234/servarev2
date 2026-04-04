@@ -8,6 +8,11 @@ def get_int(name: str) -> None | int:
     return env
 
 
+DATABASE_URL = (
+    f"postgresql+asyncpg://{os.getenv('DB_USERNAME')}:"
+    f"{os.getenv('DB_PASSWORD')}@db:5432/{os.getenv('DB_NAME')}"
+)
+
 REDIS_HOST = "redis"
 REDIS_PORT = 6379
 

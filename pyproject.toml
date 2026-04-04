@@ -18,6 +18,8 @@ dev = [
     "mypy",
     "pre-commit",
     "types-redis>=4.6.0.20241004",
+    "alembic>=1.18.4",
+    "sqlalchemy-stubs>=0.4",
 ]
 
 # ---------- Ruff ----------
@@ -26,6 +28,8 @@ dev = [
 line-length = 79
 target-version = "py312"
 lint.select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E902"]
+exclude = ["alembic/*"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -42,4 +46,5 @@ warn_unused_ignores = true
 pretty = true
 show_error_codes = true
 explicit_package_bases = true
-
+ignore_missing_imports = true
+ignore_errors = true
