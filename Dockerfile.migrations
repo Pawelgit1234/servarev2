@@ -12,4 +12,5 @@ COPY alembic.ini ./
 ENV PYTHONPATH=/app/packages/common/src
 ENV PATH="/app/.venv/bin:$PATH"
 
-RUN uv sync --frozen
+RUN uv sync --frozen --group migrations --no-dev
+CMD ["alembic", "upgrade", "head"]

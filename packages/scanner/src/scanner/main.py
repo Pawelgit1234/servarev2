@@ -1,8 +1,8 @@
 import logging
 import subprocess
 
+from common.databases import rs
 from common.logger import setup_logging
-from common.redis import rs
 from common.settings import MASSCAN_RATE, REDIS_IP_QUEUE
 
 setup_logging()

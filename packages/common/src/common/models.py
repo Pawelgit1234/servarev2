@@ -4,7 +4,7 @@ from sqlalchemy import DateTime, Integer, func
 from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.orm import Mapped, mapped_column
 
-from common.databases import Base
+from common.base import Base
 
 
 class TimestampMixin:

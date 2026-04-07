@@ -12,7 +12,6 @@ repos:
     rev: v1.8.0
     hooks:
       - id: mypy
+        language: system
+        entry: uv run mypy
         args: [--config-file=pyproject.toml]
-        additional_dependencies:
-          - types-redis
-          - sqlalchemy-stubs

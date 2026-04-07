@@ -1,13 +1,16 @@
 from logging.config import fileConfig
 
-from common.databases import Base
-from common.settings import DATABASE_URL
-from sqlalchemy import pool
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import engine_from_config, pool
 
-from alembic import context
+from alembic import context # type: ignore
+
+from common.models import *
+from common.base import Base
+from common.settings import DATABASE_URL
+
 
 config = context.config
+
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
@@ -16,33 +19,41 @@ target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
     url = DATABASE_URL.replace("postgresql+asyncpg", "postgresql+psycopg2")
+
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
+
     with context.begin_transaction():
         context.run_migrations()
 
 
-async def run_migrations_online() -> None:
-    connectable = create_async_engine(DATABASE_URL, poolclass=pool.NullPool)
+def run_migrations_online() -> None:
+    config.set_main_option(
+        "sqlalchemy.url",
+        DATABASE_URL.replace("postgresql+asyncpg", "postgresql+psycopg2"),
+    )
 
-    async with connectable.begin() as connection:
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
 
-        def do_migrations(conn) -> None:  # type: ignore
-            context.configure(connection=conn, target_metadata=target_metadata)
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+        )
+
+        with context.begin_transaction():
             context.run_migrations()
-
-        await connection.run_sync(do_migrations)
-
-    await connectable.dispose()
 
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    import asyncio
-
-    asyncio.run(run_migrations_online())
+    run_migrations_online()

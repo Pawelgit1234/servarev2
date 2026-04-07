@@ -18,3 +18,6 @@ upgrade:
 
 downgrade:
 	docker compose run --rm migrator alembic downgrade -1
+
+test:
+	docker compose run --rm tester

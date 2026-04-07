@@ -1,0 +1,19 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock ./
+COPY packages ./packages
+COPY conftest.py ./conftest.py
+
+ENV PYTHONPATH="/app/packages/common/src:/app/packages/checker/src:/app/packages/scanner/src"
+ENV PATH="/app/.venv/bin:$PATH"
+
+RUN uv sync --frozen --group test --no-dev
+RUN uv pip install -e packages/common
+RUN uv pip install -e packages/checker
+RUN uv pip install -e packages/scanner
+
+CMD ["pytest", "-s"]

@@ -1,8 +1,8 @@
 import asyncio
 import logging
 
+from common.databases import ra
 from common.logger import setup_logging
-from common.redis import ra
 from common.settings import CHECK_CONCURRENCY, REDIS_IP_QUEUE
 
 setup_logging()

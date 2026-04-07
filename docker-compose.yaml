@@ -6,10 +6,15 @@ services:
     container_name: scanner
     restart: no
     environment:
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_HOST=db
+      - DB_PORT=5432
       - MASSCAN_RATE=${MASSCAN_RATE}
     depends_on:
-      - db
       - redis
+      - migrator
     deploy:
       resources:
         limits:
@@ -26,11 +31,14 @@ services:
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
+      - DB_HOST=db
+      - DB_PORT=5432
       - CHECK_CONCURRENCY=${CHECK_CONCURRENCY}
     depends_on:
       - db
       - redis
       - scanner
+      - migrator
   
   migrator:
     build:
@@ -40,10 +48,38 @@ services:
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
-    volumes:
-    - ./alembic:/app/alembic
+      - DB_HOST=db
+      - DB_PORT=5432
     depends_on:
       - db
+  
+  tester:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_HOST=db_test
+      - DB_PORT=5433
+    profiles:
+      - manual
+    depends_on:
+      - db_test
+  
+  db_test:
+    image: postgres:18.3-alpine
+    container_name: postgres-db-test
+    restart: no
+    environment:
+      - POSTGRES_USER=${DB_USERNAME}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    profiles:
+      - manual
+    ports:
+      - 5433:5432
   
   db:
     image: postgres:18.3-alpine

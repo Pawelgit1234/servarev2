@@ -10,7 +10,7 @@ def get_int(name: str) -> None | int:
 
 DATABASE_URL = (
     f"postgresql+asyncpg://{os.getenv('DB_USERNAME')}:"
-    f"{os.getenv('DB_PASSWORD')}@db:5432/{os.getenv('DB_NAME')}"
+    f"{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
 )
 
 REDIS_HOST = "redis"
