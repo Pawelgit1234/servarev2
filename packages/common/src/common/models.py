@@ -23,3 +23,26 @@ class Server(Base, TimestampMixin):  # type: ignore
 
     ip: Mapped[str] = mapped_column(INET, nullable=False)
     port: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class ServerMotd(Base, TimestampMixin):  # type: ignore
+    __tablename__ = "server_motds"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+
+class Player(Base, TimestampMixin):  # type: ignore
+    __tablename__ = "players"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+
+class PlayerSession(Base):  # type: ignore
+    __tablename__ = "player_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    from_: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    to: Mapped[datetime] = mapped_column(nullable=True)
