@@ -4,7 +4,9 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context # type: ignore
 
-from common.models import *
+from common.models.server import *
+from common.models.player import *
+from common.models.assets import *
 from common.base import Base
 from common.settings import DATABASE_URL
 

@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 async def worker() -> None:
     while True:
-        ip = (await ra.blpop(REDIS_IP_QUEUE))[1]
-        print(ip)
+        address = (await ra.blpop(REDIS_IP_QUEUE))[1]
+        print(address)
 
 
 async def main() -> None:
