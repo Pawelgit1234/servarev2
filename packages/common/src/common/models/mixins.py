@@ -12,3 +12,9 @@ class TimestampMixin:
     #     DateTime(timezone=True), server_default=func.now(),
     #     onupdate=func.now()
     # )
+
+
+class LastSeenMixin:
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

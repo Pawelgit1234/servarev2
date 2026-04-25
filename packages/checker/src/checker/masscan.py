@@ -1,6 +1,12 @@
 from enum import Enum
 
-from pydantic import BaseModel, Field, IPvAnyAddress
+from common.checks.server import (
+    check_bedrock_server,
+    check_java_server,
+    check_legacy_server,
+)
+from common.schemas.server import ServerCheckSchema
+from pydantic import BaseModel
 
 
 class ProtocolType(Enum):
@@ -10,8 +16,8 @@ class ProtocolType(Enum):
 
 class MasscanAddressSchema(BaseModel):
     protocol: ProtocolType
-    port: int = Field(ge=0, le=65535)
-    ip: IPvAnyAddress
+    port: int
+    ip: str
 
 
 def parse_masscan_address(masscan_address: str) -> MasscanAddressSchema:
@@ -24,17 +30,16 @@ def parse_masscan_address(masscan_address: str) -> MasscanAddressSchema:
     return MasscanAddressSchema(protocol=m[1], ip=m[3], port=int(m[2]))  # type: ignore
 
 
-# async def check_server_by_masscan(
-#     masscan: MasscanAddressSchema,
-# ) -> ServerResponse | None:
-#     if masscan.protocol == ProtocolType.TCP:
-#         return await (
-#             check_java_server(masscan.ip, masscan.port)
-#             or check_legacy_server(masscan.ip, masscan.port)
-#         )
-#
-#     if masscan.protocol == ProtocolType.UDP:
-#         return await check_bedrock_server(masscan.ip, masscan.port)
-#
-#     return None
-#
+async def check_server_by_masscan(
+    masscan: MasscanAddressSchema,
+) -> ServerCheckSchema | None:
+    if masscan.protocol == ProtocolType.TCP:
+        for fn in (check_java_server, check_legacy_server):
+            result = await fn(masscan.ip, masscan.port)
+            if result:
+                return result
+
+    if masscan.protocol == ProtocolType.UDP:
+        return await check_bedrock_server(masscan.ip, masscan.port)
+
+    return None

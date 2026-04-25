@@ -1,12 +1,35 @@
+from datetime import datetime
+from typing import TYPE_CHECKING
+
 from common.base import Base
 from common.enums import ServerType
-from common.models.mixins import TimestampMixin
-from sqlalchemy import Boolean, Enum, ForeignKey, Index, Integer, String
-from sqlalchemy.dialects.postgresql import INET, JSONB
+from common.models.mixins import LastSeenMixin, TimestampMixin
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    func,
+)
+from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+if TYPE_CHECKING:
+    from common.models.assets import (
+        ServerBotSnapshotModAssociationModel,
+        ServerBotSnapshotResourcePackAssociationModel,
+        ServerSnapshotModAssociationModel,
+        ServerSnapshotPluginAssociationModel,
+        SoftwareModel,
+    )
+    from common.models.player import ServerPlayerAssociationModel
 
-class ServerModel(Base, TimestampMixin):  # type: ignore
+
+class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
     __tablename__ = "servers"
     __table_args__ = (
         Index("ix_servers_ip", "ip"),
@@ -24,6 +47,10 @@ class ServerModel(Base, TimestampMixin):  # type: ignore
     )
 
     # relationships
+    server_sessions: Mapped[list["ServerSessionModel"]] = relationship(
+        back_populates="server",
+        cascade="all, delete-orphan",
+    )
     snapshots: Mapped[list["ServerSnapshotModel"]] = relationship(
         back_populates="server",
         cascade="all, delete-orphan",
@@ -38,15 +65,41 @@ class ServerModel(Base, TimestampMixin):  # type: ignore
         back_populates="server",
         cascade="all, delete-orphan",
     )
+    server_players: Mapped[list["ServerPlayerAssociationModel"]] = (
+        relationship(
+            back_populates="server",
+            cascade="all, delete-orphan",
+        )
+    )
+
+
+class ServerSessionModel(Base):  # type: ignore
+    __tablename__ = "server_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    server_id: Mapped[int] = mapped_column(
+        ForeignKey("servers.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    server: Mapped["ServerModel"] = relationship(
+        back_populates="server_sessions"
+    )
+
+    from_: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    to: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class ServerSnapshotModel(Base, TimestampMixin):  # type: ignore
     __tablename__ = "server_snapshots"
     __table_args__ = (
-        Index("ix_server_snapshots_is_online", "is_online"),
         Index("ix_server_snapshots_version", "version"),
         Index("ix_server_snapshots_players_max", "players_max"),
-        Index("ix_server_snapshots_motd", "motd"),
         Index(
             "ix_server_snapshots_server_id_created_at",
             "server_id",
@@ -60,22 +113,20 @@ class ServerSnapshotModel(Base, TimestampMixin):  # type: ignore
         nullable=False,
         index=True,
     )
-    server: Mapped["ServerModel"] = relationship(back_populates="snapshots")
+    server: Mapped["ServerModel"] = relationship(
+        back_populates="server_snapshots"
+    )
 
     # Common
-    is_online: Mapped[bool] = mapped_column(
-        Boolean, default=True, nullable=False
-    )
     version: Mapped[str] = mapped_column(String(32), nullable=False)
     players_max: Mapped[int] = mapped_column(Integer, nullable=False)
     motd: Mapped[str] = mapped_column(String(512), nullable=False)
-    latency: Mapped[int] = mapped_column(Integer, nullable=False)
-    raw: Mapped[dict] = mapped_column(JSONB, nullable=False)  # type: ignore
+    latency: Mapped[float] = mapped_column(Float, nullable=False)
 
     # Java
     protocol: Mapped[int | None] = mapped_column(Integer, nullable=True)
     favicon: Mapped[str | None] = mapped_column(
-        String(64), nullable=True, index=True
+        String(32), nullable=True, index=True
     )  # hash
     enforcesSecureChat: Mapped[bool | None] = mapped_column(
         Boolean, nullable=True
@@ -89,7 +140,31 @@ class ServerSnapshotModel(Base, TimestampMixin):  # type: ignore
 
     # Query / Bedrock
     map_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    # Bedrock
     gamemode: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    plugin_associations: Mapped[
+        list["ServerSnapshotPluginAssociationModel"]
+    ] = relationship(
+        back_populates="server_snapshot",
+        cascade="all, delete-orphan",
+    )
+
+    mod_associations: Mapped[list["ServerSnapshotModAssociationModel"]] = (
+        relationship(
+            back_populates="server_snapshot",
+            cascade="all, delete-orphan",
+        )
+    )
+
+    software_id: Mapped[int | None] = mapped_column(
+        ForeignKey("softwares.id", ondelete="SET NULL"),
+        index=True,
+    )
+    software: Mapped["SoftwareModel"] = relationship(
+        back_populates="server_snapshots",
+    )
 
 
 class ServerDynamicSnapshotModel(Base, TimestampMixin):  # type: ignore
@@ -110,7 +185,7 @@ class ServerDynamicSnapshotModel(Base, TimestampMixin):  # type: ignore
         index=True,
     )
     server: Mapped["ServerModel"] = relationship(
-        back_populates="dynamic_snapshots"
+        back_populates="server_dynamic_snapshots"
     )
 
     players_online: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -127,18 +202,32 @@ class ServerBotSnapshotModel(Base, TimestampMixin):  # type: ignore
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+
     server_id: Mapped[int] = mapped_column(
         ForeignKey("servers.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     server: Mapped["ServerModel"] = relationship(
-        back_populates="bot_snapshots"
+        back_populates="server_bot_snapshots"
     )
 
     chunk_sections: Mapped[list["ChunkSectionModel"]] = relationship(
+        back_populates="server_bot_snapshot",
+        cascade="all, delete-orphan",
+    )
+
+    resource_pack_associations: Mapped[
+        list["ServerBotSnapshotResourcePackAssociationModel"]
+    ] = relationship(
         back_populates="bot_snapshot",
         cascade="all, delete-orphan",
+    )
+    mod_associations: Mapped[list["ServerBotSnapshotModAssociationModel"]] = (
+        relationship(
+            back_populates="bot_snapshot",
+            cascade="all, delete-orphan",
+        )
     )
 
 
@@ -151,9 +240,8 @@ class ChunkSectionModel(Base, TimestampMixin):  # type: ignore
         nullable=False,
         index=True,
     )
-
     bot_snapshot: Mapped["ServerBotSnapshotModel"] = relationship(
         back_populates="chunk_sections"
     )
 
-    hash: Mapped[str] = mapped_column(String(64), index=True)
+    hash: Mapped[str] = mapped_column(String(32), index=True)

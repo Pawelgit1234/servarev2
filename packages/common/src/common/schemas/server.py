@@ -1,22 +1,28 @@
-from typing import Any
+from datetime import datetime
 
 from common.enums import ServerType
-from pydantic import BaseModel, ConfigDict
+from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
+from common.schemas.mixins import LastSeenMixin, TimestampMixin
+from common.schemas.player import PlayerSchema, PlayerSnapshotSchema
+from pydantic import BaseModel
 
 
-class ServerSchema(BaseModel):
-    port: int
+class ServerSchema(TimestampMixin, LastSeenMixin):  # type: ignore
     ip: str
+    port: int
     server_type: ServerType
 
 
-class ServerSnapshotSchema(BaseModel):
-    is_online: bool = True
+class ServerSessionSchema(BaseModel):
+    from_: datetime
+    to: datetime | None = None
+
+
+class ServerSnapshotSchema(TimestampMixin):  # type: ignore
     version: str
     players_max: int
     motd: str
     latency: float
-    raw: dict[str, Any]
 
     protocol: int | None = None
     favicon: str | None = None
@@ -28,4 +34,26 @@ class ServerSnapshotSchema(BaseModel):
     map_name: str | None = None
     gamemode: str | None = None
 
-    model_config = ConfigDict(from_attributes=True)
+
+class ServerDynamicSnapshotSchema(TimestampMixin):  # type: ignore
+    players_online: int
+
+
+class ServerBotSnapshotSchema(TimestampMixin):  # type: ignore
+    pass
+
+
+class ChunkSectionSchema(TimestampMixin):  # type: ignore
+    hash: str
+
+
+class ServerCheckSchema(BaseModel):
+    server: ServerSchema
+    server_snapshot: ServerSnapshotSchema
+    server_dynamic_snapshot: ServerDynamicSnapshotSchema
+
+    players: dict[PlayerSchema, PlayerSnapshotSchema]
+
+    software: SoftwareSchema
+    mods: list[ModSchema]
+    plugins: list[PluginSchema]

@@ -1,0 +1,227 @@
+import logging
+
+from common.checks.player import fetch_players
+from common.enums import ServerType
+from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
+from common.schemas.server import (
+    ServerCheckSchema,
+    ServerDynamicSnapshotSchema,
+    ServerSchema,
+    ServerSnapshotSchema,
+)
+from common.settings import SERVER_CHECK_TIMEOUT
+from mcstatus import BedrockServer, JavaServer, LegacyServer
+from mcstatus.responses import JavaStatusResponse
+
+logger = logging.getLogger(__name__)
+
+logging.basicConfig(level=logging.CRITICAL)
+
+for name in (
+    "asyncio",
+    "mcstatus",
+    "dns",
+    "aiosqlite",
+):
+    logging.getLogger(name).setLevel(logging.CRITICAL)
+
+
+def detect_server_software(status: JavaStatusResponse) -> str:
+    raw = status.raw
+    name = (status.version.name or "").lower()
+    brand = str(raw.get("version", {}).get("name", "")).lower()
+
+    full = f"{name} {brand}"
+
+    checks = [
+        "fabric",
+        "quilt",
+        "neoforge",
+        "velocity",
+        "waterfall",
+        "bungee",
+        "paper",
+        "purpur",
+        "pufferfish",
+        "tuinity",
+        "airplane",
+        "spigot",
+        "craftbukkit",
+        "bukkit",
+        "sponge",
+        "spongeforge",
+        "spongevanilla",
+        "arclight",
+        "mohist",
+        "magma",
+        "catserver",
+    ]
+
+    if "modinfo" in raw:
+        return "forge"
+
+    for software in checks:
+        if software in full:
+            return software
+
+    return "vanilla"
+
+
+async def check_java_server(ip: str, port: int) -> ServerCheckSchema | None:
+    try:
+        server = await JavaServer.async_lookup(
+            f"{ip}:{port}", SERVER_CHECK_TIMEOUT
+        )
+        status = await server.async_status()
+    except Exception:
+        return None
+
+    try:
+        query = await server.async_query()
+    except Exception:
+        query = None
+
+    # --- players ---
+    players = (
+        await fetch_players(status.players.sample)
+        if status.players.sample
+        else {}
+    )
+
+    # --- forge ---
+    forge = status.forge_data
+    fml = forge.fml_network_version if forge else None
+    truncated = forge.truncated if forge else None
+
+    mods = (
+        [ModSchema(name=m.name, version=m.marker) for m in forge.mods]
+        if forge
+        else []
+    )
+
+    # --- query ---
+    if query:
+        plugins = [PluginSchema(name=name) for name in query.software.plugins]
+        software = SoftwareSchema(
+            name=query.software.brand,
+            version=query.software.version,
+        )
+        map_name = query.map_name
+    else:
+        plugins = []
+        software = SoftwareSchema(
+            name=detect_server_software(status),
+            version=status.version.name,
+        )
+        map_name = None
+
+    # --- schemas ---
+    return ServerCheckSchema(
+        server=ServerSchema(
+            ip=ip,
+            port=port,
+            server_type=ServerType.JAVA,
+        ),
+        server_snapshot=ServerSnapshotSchema(
+            version=status.version.name,
+            players_max=status.players.max,
+            motd=status.description,
+            latency=status.latency,
+            protocol=status.version.protocol,
+            favicon=status.icon,
+            enforcesSecureChat=status.enforces_secure_chat,
+            fml_network_version=fml,
+            mods_truncated=truncated,
+            map_name=map_name,
+        ),
+        server_dynamic_snapshot=ServerDynamicSnapshotSchema(
+            players_online=status.players.online
+        ),
+        players=players,
+        software=software,
+        mods=mods,
+        plugins=plugins,
+    )
+
+
+async def check_bedrock_server(ip: str, port: int) -> ServerCheckSchema | None:
+    try:
+        server = BedrockServer.lookup(f"{ip}:{port}", SERVER_CHECK_TIMEOUT)
+        status = await server.async_status()
+    except Exception:
+        return None
+
+    return ServerCheckSchema(
+        server=ServerSchema(
+            ip=ip,
+            port=port,
+            server_type=ServerType.BEDROCK,
+        ),
+        server_snapshot=ServerSnapshotSchema(
+            version=status.version.name,
+            players_max=status.players.max,
+            motd=status.description,
+            latency=status.latency,
+            map_name=status.map_name,
+            gamemode=status.gamemode,
+        ),
+        server_dynamic_snapshot=ServerDynamicSnapshotSchema(
+            players_online=status.players.online
+        ),
+        players={},
+        software=SoftwareSchema(
+            name="bedrock",
+            version=status.version.name,
+        ),
+        mods=[],
+        plugins=[],
+    )
+
+
+async def check_legacy_server(ip: str, port: int) -> ServerCheckSchema | None:
+    try:
+        server = await LegacyServer.async_lookup(
+            f"{ip}:{port}", SERVER_CHECK_TIMEOUT
+        )
+        status = await server.async_status()
+    except Exception:
+        return None
+
+    return ServerCheckSchema(
+        server=ServerSchema(
+            ip=ip,
+            port=port,
+            server_type=ServerType.LEGACY,
+        ),
+        server_snapshot=ServerSnapshotSchema(
+            version=status.version.name,
+            players_max=status.players.max,
+            motd=status.description,
+            latency=status.latency,
+            protocol=status.version.protocol,
+        ),
+        server_dynamic_snapshot=ServerDynamicSnapshotSchema(
+            players_online=status.players.online if status.players else 0
+        ),
+        players={},
+        software=SoftwareSchema(
+            name="legacy",
+            version=status.version.name,
+        ),
+        mods=[],
+        plugins=[],
+    )
+
+
+CHECKERS = {
+    ServerType.JAVA: check_java_server,
+    ServerType.BEDROCK: check_bedrock_server,
+    ServerType.LEGACY: check_legacy_server,
+}
+
+
+async def check_server_by_type(
+    ip: str, port: int, server_type: ServerType
+) -> ServerCheckSchema | None:
+    checker = CHECKERS[server_type]
+    return await checker(ip, port)

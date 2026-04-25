@@ -4,12 +4,16 @@ from pathlib import Path
 
 from common.databases import rs
 from common.logger import setup_logging
-from common.settings import MASSCAN_RATE, REDIS_IP_QUEUE
+from common.settings import (
+    MASSCAN_RATE,
+    MULTIPORT_IPS_FILEPATH,
+    REDIS_IP_QUEUE,
+)
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
-IPS_FILE = Path("./multiport_ips.txt")
+IPS_FILE = Path(MULTIPORT_IPS_FILEPATH)
 
 
 def run_masscan(args: list[str]) -> subprocess.Popen[str]:

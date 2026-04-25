@@ -38,7 +38,7 @@ addopts = "--import-mode=importlib"
 line-length = 79
 target-version = "py312"
 lint.select = ["E", "F", "I", "UP", "B", "SIM"]
-ignore = ["E902"]
+lint.ignore = ["E902"]
 exclude = ["alembic/*"]
 
 [tool.ruff.format]
