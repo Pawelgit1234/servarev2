@@ -2,15 +2,18 @@ from datetime import datetime
 
 from common.enums import ServerType
 from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
+from common.schemas.ip import IpInfoSchema
 from common.schemas.mixins import LastSeenMixin, TimestampMixin
 from common.schemas.player import PlayerSchema, PlayerSnapshotSchema
 from pydantic import BaseModel
 
 
-class ServerSchema(TimestampMixin, LastSeenMixin):  # type: ignore
+class ServerSchema(IpInfoSchema, TimestampMixin, LastSeenMixin):  # type: ignore
     ip: str
     port: int
     server_type: ServerType
+    is_lan: bool
+    is_multiport: bool = False
 
 
 class ServerSessionSchema(BaseModel):

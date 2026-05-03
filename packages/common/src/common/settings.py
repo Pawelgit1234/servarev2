@@ -17,12 +17,19 @@ REDIS_HOST = "redis"
 REDIS_PORT = 6379
 
 MULTIPORT_IPS_FILEPATH = "./multiport_ips.txt"
+SCANNER_ALL_IPS_SUFFIX = "all"
+SCANNER_MULTIPORT_IP_SUFFIX = "multiport"
 
-REDIS_IP_QUEUE = "ips"
+REDIS_IP_QUEUE = "ips"  # scanner -> checker
+REDIS_PORTER_QUEUE = "porter"  # checker -> porter
 
 MASSCAN_RATE = get_int("MASSCAN_RATE")
+MASSCAN_RATE_TARGET = get_int("MASSCAN_RATE_TARGET")
 CHECK_CONCURRENCY = get_int("CHECK_CONCURRENCY")
+PORT_CHECK_CONCURRENCY = get_int("PORT_CHECK_CONCURRENCY")
 SERVER_CHECK_TIMEOUT = get_int("SERVER_CHECK_TIMEOUT")
+AIOHTTP_TIMEOUT = get_int("AIOHTTP_TIMEOUT")
+IPINFO_API_TOKEN = os.getenv("IPINFO_API_TOKEN")
 
 S3_ROOT_USER = os.getenv("S3_ROOT_USER")
 S3_ROOT_PASSWORD = os.getenv("S3_ROOT_PASSWORD")
@@ -47,4 +54,5 @@ S3_PUBLIC_READ_POLICY = {
 
 MOJANG_BULK_URL = "https://api.mojang.com/profiles/minecraft"
 SESSION_URL = "https://sessionserver.mojang.com/session/minecraft/profile/"
-PLAYER_SEMAPHORE_COUNT = 400 // 10  # max 400 requests per 10 seconds
+PLAYER_SEMAPHORE = 400 // 10  # max 400 requests per 10 seconds
+IPINFO_SEMAPHORE = 10

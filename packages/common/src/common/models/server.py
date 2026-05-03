@@ -42,9 +42,26 @@ class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
 
     ip: Mapped[str] = mapped_column(INET, nullable=False)
     port: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_lan: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_multiport: Mapped[bool] = mapped_column(Boolean, nullable=False)
     server_type: Mapped[ServerType] = mapped_column(
         Enum(ServerType), nullable=False
     )
+
+    last_deep_check_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    # Geo
+    country: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    region: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Other IP stuff
+    hostname: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    asn: Mapped[str | None] = mapped_column(String(150), nullable=True)
 
     # relationships
     server_sessions: Mapped[list["ServerSessionModel"]] = relationship(
@@ -212,7 +229,7 @@ class ServerBotSnapshotModel(Base, TimestampMixin):  # type: ignore
         back_populates="server_bot_snapshots"
     )
 
-    chunk_sections: Mapped[list["ChunkSectionModel"]] = relationship(
+    subchunks: Mapped[list["SubchunkModel"]] = relationship(
         back_populates="server_bot_snapshot",
         cascade="all, delete-orphan",
     )
@@ -231,8 +248,8 @@ class ServerBotSnapshotModel(Base, TimestampMixin):  # type: ignore
     )
 
 
-class ChunkSectionModel(Base, TimestampMixin):  # type: ignore
-    __tablename__ = "chunk_sections"
+class SubchunkModel(Base, TimestampMixin):  # type: ignore
+    __tablename__ = "subchunks"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     bot_snapshot_id: Mapped[int] = mapped_column(
@@ -241,7 +258,7 @@ class ChunkSectionModel(Base, TimestampMixin):  # type: ignore
         index=True,
     )
     bot_snapshot: Mapped["ServerBotSnapshotModel"] = relationship(
-        back_populates="chunk_sections"
+        back_populates="subchunks"
     )
 
     hash: Mapped[str] = mapped_column(String(32), index=True)

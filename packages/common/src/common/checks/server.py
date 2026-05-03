@@ -1,4 +1,5 @@
 import logging
+import re
 
 from common.checks.player import fetch_players
 from common.enums import ServerType
@@ -28,10 +29,10 @@ for name in (
 
 def detect_server_software(status: JavaStatusResponse) -> str:
     raw = status.raw
-    name = (status.version.name or "").lower()
-    brand = str(raw.get("version", {}).get("name", "")).lower()
+    name = status.version.name.lower()
+    motd = status.description.lower()
 
-    full = f"{name} {brand}"
+    full = f"{name} {motd}"
 
     checks = [
         "fabric",
@@ -55,6 +56,8 @@ def detect_server_software(status: JavaStatusResponse) -> str:
         "mohist",
         "magma",
         "catserver",
+        "geyser",
+        "floodgate",
     ]
 
     if "modinfo" in raw:
@@ -65,6 +68,18 @@ def detect_server_software(status: JavaStatusResponse) -> str:
             return software
 
     return "vanilla"
+
+
+def is_lan(players_online: int, players_max: int, motd: str) -> bool:
+    pattern = r"^[A-Za-z0-9_ ]+\s*-\s*.+$"
+    valid_lan_motd = bool(re.match(pattern, motd))
+
+    return (
+        " - " in motd
+        and players_online >= 1
+        and players_max == 8
+        and valid_lan_motd
+    )
 
 
 async def check_java_server(ip: str, port: int) -> ServerCheckSchema | None:
@@ -121,6 +136,11 @@ async def check_java_server(ip: str, port: int) -> ServerCheckSchema | None:
             ip=ip,
             port=port,
             server_type=ServerType.JAVA,
+            is_lan=is_lan(
+                status.players.online,
+                status.players.max,
+                status.motd.to_plain(),
+            ),
         ),
         server_snapshot=ServerSnapshotSchema(
             version=status.version.name,
@@ -156,6 +176,7 @@ async def check_bedrock_server(ip: str, port: int) -> ServerCheckSchema | None:
             ip=ip,
             port=port,
             server_type=ServerType.BEDROCK,
+            is_lan=False,
         ),
         server_snapshot=ServerSnapshotSchema(
             version=status.version.name,
@@ -192,6 +213,11 @@ async def check_legacy_server(ip: str, port: int) -> ServerCheckSchema | None:
             ip=ip,
             port=port,
             server_type=ServerType.LEGACY,
+            is_lan=is_lan(
+                status.players.online,
+                status.players.max,
+                status.motd.to_plain(),
+            ),
         ),
         server_snapshot=ServerSnapshotSchema(
             version=status.version.name,

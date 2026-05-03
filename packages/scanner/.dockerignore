@@ -20,5 +20,5 @@ Pipfile.lock
 todo.txt
 README.md
 
-compose.yaml
+docker-compose.yaml
 Makefile

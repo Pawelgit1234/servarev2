@@ -8,6 +8,8 @@ from common.settings import (
     MASSCAN_RATE,
     MULTIPORT_IPS_FILEPATH,
     REDIS_IP_QUEUE,
+    SCANNER_ALL_IPS_SUFFIX,
+    SCANNER_MULTIPORT_IP_SUFFIX,
 )
 
 setup_logging()
@@ -37,7 +39,7 @@ def run_masscan(args: list[str]) -> subprocess.Popen[str]:
     )
 
 
-def process_output(proc: subprocess.Popen[str]) -> None:
+def process_output(proc: subprocess.Popen[str], suffix: str) -> None:
     """Sends open ports to checker"""
 
     while True:
@@ -47,71 +49,54 @@ def process_output(proc: subprocess.Popen[str]) -> None:
             break
 
         line = line.strip()
+
         if "open" in line:
-            rs.rpush(REDIS_IP_QUEUE, line)
+            rs.rpush(REDIS_IP_QUEUE, f"{line} {suffix}")
+
+    proc.wait()
 
 
 def scan_full_internet() -> None:
-    """Scans the whole internet"""
+    """Scans full internet (TCP + UDP in one pass)"""
 
     logger.info("Full internet scan")
 
-    # TCP (Java Servers)
     process_output(
         run_masscan(
             [
                 "0.0.0.0/0",
-                "-p25565",
+                "-p25565,U:19132",
             ]
-        )
-    )
-
-    # UDP (Bedrock Servers)
-    process_output(
-        run_masscan(
-            [
-                "0.0.0.0/0",
-                "-pU:19132",
-            ]
-        )
+        ),
+        SCANNER_ALL_IPS_SUFFIX,
     )
 
 
 def scan_multiport_ips() -> None:
-    """Scans hosts like Playit.gg"""
+    """Scans multiport IP list"""
 
     if not IPS_FILE.exists():
         logger.warning("multiport_ips.txt not found, skipping")
         return
 
-    logger.info("Multiport ips scan")
+    logger.info("Multiport IPs scan")
 
-    # TCP (Java Servers)
     process_output(
         run_masscan(
             [
                 "-iL",
                 str(IPS_FILE),
-                "-p1-65535",
+                "-p1-65535,U:1-65535",
             ]
-        )
-    )
-
-    # UDP (Bedrock Servers)
-    process_output(
-        run_masscan(
-            [
-                "-iL",
-                str(IPS_FILE),
-                "-pU:1-65535",
-            ]
-        )
+        ),
+        SCANNER_MULTIPORT_IP_SUFFIX,
     )
 
 
 def main() -> None:
+    logger.info("Starts running")
     while True:
-        logger.info("Next cycle")
+        logger.info("Start of cycle")
         scan_full_internet()
         scan_multiport_ips()
 

@@ -1,0 +1,16 @@
+[project]
+name = "porter"
+version = "0.1.0"
+description = "Finds all open ports on a server"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "common"
+]
+
+[project.scripts]
+porter = "porter:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

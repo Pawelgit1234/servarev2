@@ -1,80 +1,95 @@
 import asyncio
 import base64
 import json
+import uuid
 
-import aiohttp
+from aiohttp import ClientError
 from common.enums import PlayerType
 from common.schemas.player import PlayerSchema, PlayerSnapshotSchema
-from common.settings import PLAYER_SEMAPHORE_COUNT, SESSION_URL
+from common.session import session_manager
+from common.settings import PLAYER_SEMAPHORE, SESSION_URL
 from mcstatus.responses import JavaStatusPlayer
 
-SEMAPHORE = asyncio.Semaphore(PLAYER_SEMAPHORE_COUNT)
+s = asyncio.Semaphore(PLAYER_SEMAPHORE)
 
 # No need, because status already includes uuids
 #
-# async def fetch_uuids(
-#     session: aiohttp.ClientSession, names: list[str]
-# ) -> dict[str, str]:
+# async def fetch_uuids(names: list[str]) -> dict[str, str]:
 #     async with session.post(MOJANG_BULK_URL, json=names) as resp:
 #         data = await resp.json()
 #
 #     return {item["name"]: item["id"] for item in data}
 
 
-async def fetch_profile(
-    session: aiohttp.ClientSession, name: str, uuid: str
-) -> tuple[PlayerSchema, PlayerSnapshotSchema]:
-    async with SEMAPHORE, session.get(f"{SESSION_URL}{uuid}") as resp:
-        if resp.status != 200:
-            player = PlayerSchema(
-                uuid=uuid,
-                player_type=PlayerType.OFFLINE,
-            )
-            snapshot = PlayerSnapshotSchema(
-                name=name,
-                skin=None,
-                cape=None,
-            )
-            return player, snapshot
+def normalize_uuid_dashed(u: str) -> str | None:
+    try:
+        return str(uuid.UUID(u))
+    except ValueError:
+        return None
 
-        data = await resp.json()
+
+def is_offline_uuid(name: str, u: str) -> bool:
+    expected = uuid.uuid3(uuid.NAMESPACE_DNS, f"OfflinePlayer:{name}")
+    return str(expected) == str(uuid.UUID(u))
+
+
+async def fetch_profile(
+    name: str, uuid_raw: str
+) -> tuple[PlayerSchema, PlayerSnapshotSchema]:
+    u = normalize_uuid_dashed(uuid_raw)
+
+    if u is None:
+        return (
+            PlayerSchema(uuid=uuid_raw, player_type=PlayerType.OFFLINE),
+            PlayerSnapshotSchema(name=name, skin=None, cape=None),
+        )
+
+    offline = (
+        PlayerSchema(uuid=u, player_type=PlayerType.OFFLINE),
+        PlayerSnapshotSchema(name=name, skin=None, cape=None),
+    )
+
+    if name.startswith((".", "*")):  # geyser/floodgate
+        return (
+            PlayerSchema(uuid=u, player_type=PlayerType.BEDROCK),
+            PlayerSnapshotSchema(name=name, skin=None, cape=None),
+        )
+
+    if is_offline_uuid(name, u):
+        return offline
+
+    try:
+        async with s, session_manager.session.get(f"{SESSION_URL}{u}") as resp:
+            if resp.status != 200:
+                return offline
+
+            data = await resp.json()
+    except (TimeoutError, ClientError):
+        return offline
 
     if data["name"].lower() != name.lower():
-        player = PlayerSchema(
-            uuid=uuid,
-            player_type=PlayerType.OFFLINE,
-        )
-        snapshot = PlayerSnapshotSchema(
-            name=name,
-            skin=None,
-            cape=None,
-        )
-        return player, snapshot
+        return offline
 
-    textures = data["properties"][0]["value"]
-    decoded = json.loads(base64.b64decode(textures))
+    properties = data.get("properties", [])
+    skin = cape = None
 
-    skin = decoded["textures"].get("SKIN", {}).get("url")
-    cape = decoded["textures"].get("CAPE", {}).get("url")
+    if properties:
+        value = properties[0].get("value")
+        if value:
+            decoded = json.loads(base64.b64decode(value))
+            skin = decoded["textures"].get("SKIN", {}).get("url")
+            cape = decoded["textures"].get("CAPE", {}).get("url")
 
-    player = PlayerSchema(
-        uuid=uuid,
-        player_type=PlayerType.PREMIUM,
+    return (
+        PlayerSchema(uuid=u, player_type=PlayerType.PREMIUM),
+        PlayerSnapshotSchema(name=name, skin=skin, cape=cape),
     )
-    snapshot = PlayerSnapshotSchema(
-        name=name,
-        skin=skin,
-        cape=cape,
-    )
-
-    return player, snapshot
 
 
 async def fetch_players(
     players: list[JavaStatusPlayer],
 ) -> dict[PlayerSchema, PlayerSnapshotSchema]:
-    async with aiohttp.ClientSession() as session:
-        tasks = [fetch_profile(session, p.name, p.uuid) for p in players]
-        results = await asyncio.gather(*tasks)
+    tasks = [fetch_profile(p.name, p.uuid) for p in players]
+    results = await asyncio.gather(*tasks)
 
     return {player: snapshot for player, snapshot in results}
