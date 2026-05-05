@@ -16,8 +16,6 @@ from mcstatus.responses import JavaStatusResponse
 
 logger = logging.getLogger(__name__)
 
-logging.basicConfig(level=logging.CRITICAL)
-
 for name in (
     "asyncio",
     "mcstatus",

@@ -36,7 +36,7 @@ def run_masscan(ip: str, ports: str) -> subprocess.Popen[str]:
 def scan_ip(ip: str) -> str:
     """Scans all ip ports (tcp + udp in one run)"""
 
-    proc = run_masscan(ip, "-p1-65535,U:1-65535")
+    proc = run_masscan(ip, "-p1-65535")  # TODO: ,U:1-65535
 
     ports = "tcp:"
     udp_ports = []

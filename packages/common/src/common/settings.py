@@ -13,10 +13,21 @@ DATABASE_URL = (
     f"{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
 )
 
-REDIS_HOST = "redis"
 REDIS_PORT = 6379
 
-MULTIPORT_IPS_FILEPATH = "./multiport_ips.txt"
+DISABLE_DOCKER = os.getenv("DISABLE_DOCKER")
+
+if DISABLE_DOCKER is None:
+    MULTIPORT_IPS_FILEPATH = "./multiport_ips.txt"
+    EXCLUDE_IPS = "./exclude.conf"
+    REDIS_HOST = "redis"
+else:
+    MULTIPORT_IPS_FILEPATH = "./multiport_ips.txt"
+    EXCLUDE_IPS = "./exclude.conf"
+    # MULTIPORT_IPS_FILEPATH = "./packages/scanner/multiport_ips.txt"
+    # EXCLUDE_IPS = "./packages/scanner/exclude.conf"
+    REDIS_HOST = "localhost"
+
 SCANNER_ALL_IPS_SUFFIX = "all"
 SCANNER_MULTIPORT_IP_SUFFIX = "multiport"
 

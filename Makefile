@@ -21,3 +21,6 @@ downgrade:
 
 test:
 	docker compose run --rm tester
+
+run:
+	bash run.sh

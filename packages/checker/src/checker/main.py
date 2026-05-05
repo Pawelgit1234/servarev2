@@ -57,7 +57,7 @@ async def worker() -> None:
 
             print(
                 f"{server.server.ip}:{server.server.port}",
-                "{server.server_snapshot.motd}",
+                f"{server.server_snapshot.motd}",
                 f"{server.server.country}",
             )
 

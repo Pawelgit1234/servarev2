@@ -5,6 +5,7 @@ from pathlib import Path
 from common.databases import rs
 from common.logger import setup_logging
 from common.settings import (
+    EXCLUDE_IPS,
     MASSCAN_RATE,
     MULTIPORT_IPS_FILEPATH,
     REDIS_IP_QUEUE,
@@ -32,7 +33,7 @@ def run_masscan(args: list[str]) -> subprocess.Popen[str]:
             "-oL",
             "-",
             "--excludefile",
-            "./exclude.conf",
+            EXCLUDE_IPS,
         ],
         stdout=subprocess.PIPE,
         text=True,
@@ -52,6 +53,7 @@ def process_output(proc: subprocess.Popen[str], suffix: str) -> None:
 
         if "open" in line:
             rs.rpush(REDIS_IP_QUEUE, f"{line} {suffix}")
+            print(line)
 
     proc.wait()
 
@@ -65,7 +67,7 @@ def scan_full_internet() -> None:
         run_masscan(
             [
                 "0.0.0.0/0",
-                "-p25565,U:19132",
+                "-p25565",  # TODO: ,U:19132
             ]
         ),
         SCANNER_ALL_IPS_SUFFIX,

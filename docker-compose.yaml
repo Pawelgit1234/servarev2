@@ -30,11 +30,11 @@ services:
       - DB_PORT=5432
       - MASSCAN_RATE=${MASSCAN_RATE}
       - MASSCAN_RATE_TARGET=${MASSCAN_RATE_TARGET}
+    profiles:
+      - manual
     depends_on:
       - migrator
-      - checker
       - redis
-      - db
   
   checker:
     build:
@@ -58,7 +58,6 @@ services:
     depends_on:
       - db
       - redis
-      - scanner
       - migrator
   
   migrator:
