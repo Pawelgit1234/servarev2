@@ -15,19 +15,12 @@ DATABASE_URL = (
 
 REDIS_PORT = 6379
 
-DISABLE_DOCKER = os.getenv("DISABLE_DOCKER")
+IS_NETWORK_MODE_HOST = os.getenv("IS_NETWORK_MODE_HOST")
 
-if DISABLE_DOCKER is None:
-    MULTIPORT_IPS_FILEPATH = "./multiport_ips.txt"
-    EXCLUDE_IPS = "./exclude.conf"
-    REDIS_HOST = "redis"
-else:
-    MULTIPORT_IPS_FILEPATH = "./multiport_ips.txt"
-    EXCLUDE_IPS = "./exclude.conf"
-    # MULTIPORT_IPS_FILEPATH = "./packages/scanner/multiport_ips.txt"
-    # EXCLUDE_IPS = "./packages/scanner/exclude.conf"
-    REDIS_HOST = "localhost"
+REDIS_HOST = "redis" if IS_NETWORK_MODE_HOST is None else "localhost"
 
+MULTIPORT_IPS_FILEPATH = "./multiport_ips.txt"
+EXCLUDE_IPS = "./exclude.conf"
 SCANNER_ALL_IPS_SUFFIX = "all"
 SCANNER_MULTIPORT_IP_SUFFIX = "multiport"
 

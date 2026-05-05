@@ -53,7 +53,6 @@ def process_output(proc: subprocess.Popen[str], suffix: str) -> None:
 
         if "open" in line:
             rs.rpush(REDIS_IP_QUEUE, f"{line} {suffix}")
-            print(line)
 
     proc.wait()
 

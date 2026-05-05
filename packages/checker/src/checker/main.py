@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 async def worker() -> None:
     while True:
         address: str = (await ra.blpop(REDIS_IP_QUEUE))[1]
-        print(address)
 
         if address.startswith(REDIS_PORTER_QUEUE):
             ports, ip = parse_porter_address(address)
@@ -46,6 +45,11 @@ async def worker() -> None:
             if ip_info is None:
                 # TODO: save to db, but save las_deep_check_at so, that monitor
                 # will try again
+                print(
+                    f"{server.server.ip}:{server.server.port}",
+                    f"{server.server_snapshot.motd}",
+                    f"{server.server.country} ==== no ipinfo",
+                )
                 continue
 
             server = merge_server_check_with_ip_info(server, ip_info)

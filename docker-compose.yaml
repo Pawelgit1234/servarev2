@@ -12,9 +12,14 @@ services:
       - DB_HOST=db
       - DB_PORT=5432
       - MASSCAN_RATE=${MASSCAN_RATE}
+      - IS_NETWORK_MODE_HOST=1
+    network_mode: host
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    privileged: true 
     depends_on:
       - redis
-      - migrator
   
   porter:
     build:
@@ -30,10 +35,13 @@ services:
       - DB_PORT=5432
       - MASSCAN_RATE=${MASSCAN_RATE}
       - MASSCAN_RATE_TARGET=${MASSCAN_RATE_TARGET}
-    profiles:
-      - manual
+      - IS_NETWORK_MODE_HOST=1
+    network_mode: host
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    privileged: true 
     depends_on:
-      - migrator
       - redis
   
   checker:
