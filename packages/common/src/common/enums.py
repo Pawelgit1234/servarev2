@@ -16,3 +16,22 @@ class ServerType(Enum):
 class ProtocolType(Enum):
     TCP = "tcp"
     UDP = "udp"
+
+
+class DetectedServiceType(Enum):
+    # Maps
+    BLUEMAP = "bluemap"
+    DYNMAP = "dynmap"
+    PL3XMAP = "pl3xmap"
+    SQUAREMAP = "squaremap"
+
+    # Panels
+    AMP = "amp"
+    PTERODACTYL = "pterodactyl"
+    PELICAN = "pelican"
+    MULTICRAFT = "multicraft"
+    CRAFTY = "crafty"
+
+    # Other
+    GENERIC_HTTP = "generic_http"
+    UNKNOWN = "unknown"

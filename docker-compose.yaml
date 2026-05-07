@@ -9,7 +9,7 @@ services:
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
-      - DB_HOST=db
+      - DB_HOST=localhost
       - DB_PORT=5432
       - MASSCAN_RATE=${MASSCAN_RATE}
       - IS_NETWORK_MODE_HOST=1
@@ -31,11 +31,12 @@ services:
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
-      - DB_HOST=db
+      - DB_HOST=localhost
       - DB_PORT=5432
       - MASSCAN_RATE=${MASSCAN_RATE}
       - MASSCAN_RATE_TARGET=${MASSCAN_RATE_TARGET}
       - IS_NETWORK_MODE_HOST=1
+      - PORTER_BATCH_SIZE=${PORTER_BATCH_SIZE}
     network_mode: host
     cap_add:
       - NET_RAW
