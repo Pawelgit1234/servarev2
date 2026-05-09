@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from common.base import Base
-from common.enums import ServerType
+from common.enums import DetectedServiceType, ProtocolType, ServerType
 from common.models.mixins import LastSeenMixin, TimestampMixin
 from sqlalchemy import (
     Boolean,
@@ -88,6 +88,10 @@ class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
             cascade="all, delete-orphan",
         )
     )
+    server_ports: Mapped[list["ServerPortAssociationModel"]] = relationship(
+        back_populates="server",
+        cascade="all, delete-orphan",
+    )
 
 
 class ServerSessionModel(Base):  # type: ignore
@@ -109,6 +113,45 @@ class ServerSessionModel(Base):  # type: ignore
     )
     to: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+
+class ServerPortModel(Base):  # type: ignore
+    __tablename__ = "server_ports"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    servers: Mapped[list["ServerPortAssociationModel"]] = relationship(
+        back_populates="server_port",
+        cascade="all, delete-orphan",
+    )
+
+    port: Mapped[int] = mapped_column(Integer, nullable=False)
+    protocol_type: Mapped[ProtocolType] = mapped_column(
+        Enum(ProtocolType), nullable=False
+    )
+    detected_service_type: Mapped[DetectedServiceType] = mapped_column(
+        Enum(DetectedServiceType), nullable=False
+    )
+
+
+class ServerPortAssociationModel(Base):  # type: ignore
+    __tablename__ = "server_port_associations"
+
+    server_id: Mapped[int] = mapped_column(
+        ForeignKey("servers.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    server: Mapped["ServerModel"] = relationship(
+        back_populates="server_ports",
+    )
+
+    server_port_id: Mapped[int] = mapped_column(
+        ForeignKey("server_ports.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    server_port: Mapped["ServerPortModel"] = relationship(
+        back_populates="servers",
     )
 
 

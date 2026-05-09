@@ -1,20 +1,17 @@
 import asyncio
 
-from common.enums import ProtocolType
-from common.schemas.server import ServerCheckSchema
+from common.enums import DetectedServiceType, ProtocolType
+from common.schemas.server import (
+    PorterSchema,
+    ServerCheckSchema,
+    ServerPortSchema,
+)
 from common.settings import PORT_CHECK_CONCURRENCY
-from pydantic import BaseModel, ConfigDict
 
 from checker.check import check_server_by_protocol
+from checker.detect import detect_service
 
 sem = asyncio.Semaphore(PORT_CHECK_CONCURRENCY)
-
-
-class PorterSchema(BaseModel):
-    protocol: ProtocolType
-    port: int
-
-    model_config = ConfigDict(frozen=True)
 
 
 def parse_porter_address(
@@ -34,9 +31,22 @@ def parse_porter_address(
     return port_schemas, ip
 
 
-async def limited_check(p: PorterSchema, ip: str) -> ServerCheckSchema | None:
+async def limited_check(
+    p: PorterSchema, ip: str
+) -> ServerPortSchema | ServerCheckSchema:
     async with sem:
-        return await check_server_by_protocol(p.protocol, ip, p.port)
+        server = await check_server_by_protocol(p.protocol, ip, p.port)
+        if server is not None:
+            return server
+
+        if p.protocol == ProtocolType.UDP:
+            return ServerPortSchema(
+                port=p.port,
+                protocol_type=p.protocol,
+                detected_service_type=DetectedServiceType.UNKNOWN,
+            )
+
+        return await detect_service(ip, p.port)
 
 
 async def scan_ports(

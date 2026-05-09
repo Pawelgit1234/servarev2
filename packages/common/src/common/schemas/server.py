@@ -1,11 +1,11 @@
 from datetime import datetime
 
-from common.enums import ServerType
+from common.enums import DetectedServiceType, ProtocolType, ServerType
 from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
 from common.schemas.ip import IpInfoSchema
 from common.schemas.mixins import LastSeenMixin, TimestampMixin
 from common.schemas.player import PlayerSchema, PlayerSnapshotSchema
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class ServerSchema(IpInfoSchema, TimestampMixin, LastSeenMixin):  # type: ignore
@@ -14,6 +14,19 @@ class ServerSchema(IpInfoSchema, TimestampMixin, LastSeenMixin):  # type: ignore
     server_type: ServerType
     is_lan: bool
     is_multiport: bool = False
+
+
+class PorterSchema(BaseModel):
+    protocol: ProtocolType
+    port: int
+
+    model_config = ConfigDict(frozen=True)
+
+
+class ServerPortSchema(BaseModel):
+    port: int
+    protocol_type: ProtocolType
+    detected_service_type: DetectedServiceType
 
 
 class ServerSessionSchema(BaseModel):

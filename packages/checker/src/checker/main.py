@@ -4,6 +4,7 @@ import logging
 from common.checks.ip import get_ip_info
 from common.databases import ra
 from common.logger import setup_logging
+from common.schemas.server import ServerPortSchema
 from common.session import session_manager
 from common.settings import (
     CHECK_CONCURRENCY,
@@ -27,11 +28,19 @@ async def worker() -> None:
         if address.startswith(REDIS_PORTER_QUEUE):
             ports, ip = parse_porter_address(address)
             responses = await scan_ports(ports, ip)
-            print(responses)
+
+            print(
+                [
+                    r
+                    for r in responses.values()
+                    if isinstance(r, ServerPortSchema)
+                ]
+            )
         else:
             masscan = parse_masscan_address(address)
 
             # TODO: if server already in database: next ip
+            #       but, will be redis faster? Or it is ok for db?
 
             server = await check_server_by_protocol(
                 masscan.protocol, masscan.ip, masscan.port
