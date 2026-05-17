@@ -112,12 +112,23 @@ class ServerSessionModel(Base):  # type: ignore
         DateTime(timezone=True), server_default=func.now()
     )
     to: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        DateTime(timezone=True), nullable=True, default=None
     )
 
 
 class ServerPortModel(Base):  # type: ignore
     __tablename__ = "server_ports"
+    __table_args__ = (
+        Index(
+            "ix_server_ports_protocol_type_port",
+            "protocol_type",
+            "port",
+        ),
+        Index(
+            "ix_server_ports_detected_service_type",
+            "detected_service_type",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -135,7 +146,7 @@ class ServerPortModel(Base):  # type: ignore
     )
 
 
-class ServerPortAssociationModel(Base):  # type: ignore
+class ServerPortAssociationModel(Base, TimestampMixin):  # type: ignore
     __tablename__ = "server_port_associations"
 
     server_id: Mapped[int] = mapped_column(

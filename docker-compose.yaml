@@ -64,6 +64,7 @@ services:
       - S3_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
       - IPINFO_API_TOKEN=${IPINFO_API_TOKEN}
       - AIOHTTP_TIMEOUT=${AIOHTTP_TIMEOUT}
+      - DEEP_CHECK_INTERVAL_DAYS=${DEEP_CHECK_INTERVAL_DAYS}
     depends_on:
       - db
       - redis
@@ -79,6 +80,8 @@ services:
       - DB_NAME=${DB_NAME}
       - DB_HOST=db
       - DB_PORT=5432
+    volumes:
+      - ./alembic:/app/alembic
     depends_on:
       - db
   
@@ -122,6 +125,17 @@ services:
       - 5432:5432
     volumes:
       - pgdata:/var/lib/postgresql/data
+  
+  pgweb:
+    image: sosedoff/pgweb:0.17.0
+    container_name: pgweb
+    restart: no
+    environment:
+      - DATABASE_URL=postgres://${DB_USERNAME}:${DB_PASSWORD}@db:5432/${DB_NAME}?sslmode=disable
+    ports:
+      - 8081:8081
+    depends_on:
+      - db
   
   redis:
     image: redis:8.6.2-alpine

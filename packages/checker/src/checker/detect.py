@@ -8,9 +8,7 @@ SIGNATURES: dict[DetectedServiceType, list[str]] = {
     DetectedServiceType.BLUEMAP: [
         "bluemap",
     ],
-    DetectedServiceType.DYNMAP: [
-        "dynmap",
-    ],
+    DetectedServiceType.DYNMAP: ["dynmap", "dynamic"],
     DetectedServiceType.PL3XMAP: [
         "pl3xmap",
     ],
@@ -27,6 +25,7 @@ SIGNATURES: dict[DetectedServiceType, list[str]] = {
     ],
     DetectedServiceType.AMP: [
         "cubecoders amp",
+        "amp",
         "application management panel",
     ],
     DetectedServiceType.MULTICRAFT: [

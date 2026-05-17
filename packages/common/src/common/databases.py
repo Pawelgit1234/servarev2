@@ -5,7 +5,9 @@ from common.settings import DATABASE_URL, REDIS_HOST, REDIS_PORT
 
 # Database
 engine = create_async_engine(DATABASE_URL)
-async_session = async_sessionmaker(engine, expire_on_commit=False)
+async_session = async_sessionmaker(
+    engine, expire_on_commit=False, autoflush=False
+)
 
 # Redis
 rs = redis.Redis(

@@ -4,7 +4,7 @@ from common.schemas.server import ServerCheckSchema
 
 def merge_server_check_with_ip_info(
     server: ServerCheckSchema, ip_info: IpInfoSchema
-) -> ServerCheckSchema:
+) -> None:
     server.server.country = ip_info.country
     server.server.region = ip_info.region
     server.server.city = ip_info.city
@@ -12,4 +12,3 @@ def merge_server_check_with_ip_info(
     server.server.longitude = ip_info.longitude
     server.server.hostname = ip_info.hostname
     server.server.asn = ip_info.asn
-    return server

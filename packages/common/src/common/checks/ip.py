@@ -8,17 +8,17 @@ from common.settings import IPINFO_API_TOKEN, IPINFO_SEMAPHORE
 s = asyncio.Semaphore(IPINFO_SEMAPHORE)
 
 
-async def get_ip_info(ip: str) -> IpInfoSchema | None:
+async def get_ip_info(ip: str) -> IpInfoSchema:
     url = f"https://ipinfo.io/{ip}/json?token={IPINFO_API_TOKEN}"
 
     try:
         async with s, session_manager.session.get(url) as resp:
             if resp.status != 200:
-                return None
+                return IpInfoSchema()
 
             data = await resp.json()
     except (TimeoutError, ClientError):
-        return None
+        return IpInfoSchema()
 
     loc = data.get("loc")
     lat, lon = (None, None)

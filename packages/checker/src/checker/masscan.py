@@ -1,6 +1,11 @@
+from common.checks.ip import get_ip_info
 from common.enums import ProtocolType
+from common.schemas.server import ServerCheckSchema
 from common.settings import SCANNER_MULTIPORT_IP_SUFFIX
+from common.utils import merge_server_check_with_ip_info
 from pydantic import BaseModel
+
+from checker.check import check_server_by_protocol
 
 
 class MasscanAddressSchema(BaseModel):
@@ -23,3 +28,19 @@ def parse_masscan_address(masscan_address: str) -> MasscanAddressSchema:
         ip=ip,
         is_multiport=m == SCANNER_MULTIPORT_IP_SUFFIX,
     )
+
+
+async def process_masscan(
+    masscan: MasscanAddressSchema,
+) -> ServerCheckSchema | None:
+    server = await check_server_by_protocol(
+        masscan.protocol, masscan.ip, masscan.port
+    )
+    if server is None:
+        return None
+
+    server.server.is_multiport = masscan.is_multiport
+
+    ip_info = await get_ip_info(masscan.ip)
+    merge_server_check_with_ip_info(server, ip_info)
+    return server

@@ -20,7 +20,7 @@ class SoftwareModel(Base, TimestampMixin):  # type: ignore
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(32), nullable=False)
     version: Mapped[str] = mapped_column(String(32), nullable=False)
 
     server_snapshots: Mapped[list["ServerSnapshotModel"]] = relationship(
@@ -116,7 +116,7 @@ class ModModel(Base, TimestampMixin):  # type: ignore
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    name: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(32), nullable=False)
     version: Mapped[str] = mapped_column(String(32), nullable=False)
 
     snapshot_associations: Mapped[
