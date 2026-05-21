@@ -1,6 +1,11 @@
 from datetime import datetime
 
-from common.enums import DetectedServiceType, ProtocolType, ServerType
+from common.enums import (
+    AssetField,
+    DetectedServiceType,
+    ProtocolType,
+    ServerType,
+)
 from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
 from common.schemas.ip import IpInfoSchema
 from common.schemas.mixins import LastSeenMixin, TimestampMixin
@@ -16,20 +21,13 @@ class ServerSchema(IpInfoSchema, TimestampMixin, LastSeenMixin):  # type: ignore
     is_multiport: bool = False
 
 
-class PorterSchema(BaseModel):
-    protocol: ProtocolType
-    port: int
-
-    model_config = ConfigDict(frozen=True)
-
-
-class ServerPortSchema(BaseModel):
+class ServerPortSchema(BaseModel):  # type: ignore
     port: int
     protocol_type: ProtocolType
     detected_service_type: DetectedServiceType
 
 
-class ServerSessionSchema(BaseModel):
+class ServerSessionSchema(BaseModel):  # type: ignore
     from_: datetime
     to: datetime | None = None
 
@@ -41,7 +39,7 @@ class ServerSnapshotSchema(TimestampMixin):  # type: ignore
     latency: float
 
     protocol: int | None = None
-    favicon: str | None = None
+    icon: str | None = None
     enforcesSecureChat: bool | None = None
 
     fml_network_version: int | None = None
@@ -63,7 +61,7 @@ class ChunkSectionSchema(TimestampMixin):  # type: ignore
     hash: str
 
 
-class ServerCheckSchema(BaseModel):
+class ServerCheckSchema(BaseModel):  # type: ignore
     server: ServerSchema
     server_snapshot: ServerSnapshotSchema
     server_dynamic_snapshot: ServerDynamicSnapshotSchema
@@ -73,3 +71,18 @@ class ServerCheckSchema(BaseModel):
     software: SoftwareSchema
     mods: list[ModSchema]
     plugins: list[PluginSchema]
+
+
+class PendingServerAssetSchema(BaseModel):  # type: ignore
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    owner: ServerSnapshotSchema | PlayerSnapshotSchema
+    field: AssetField
+
+    prefix: str
+    content_type: str | None = None
+
+    source: str
+    is_base64: bool
+
+    data: bytes | None = None

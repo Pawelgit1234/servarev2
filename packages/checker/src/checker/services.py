@@ -64,7 +64,7 @@ async def save_non_existing_server(
         motd=data.server_snapshot.motd,
         latency=data.server_snapshot.latency,
         protocol=data.server_snapshot.protocol,
-        favicon=data.server_snapshot.favicon,
+        icon=data.server_snapshot.icon,
         enforcesSecureChat=data.server_snapshot.enforcesSecureChat,
         fml_network_version=data.server_snapshot.fml_network_version,
         mods_truncated=data.server_snapshot.mods_truncated,

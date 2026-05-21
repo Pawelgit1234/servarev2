@@ -58,6 +58,7 @@ pretty = true
 show_error_codes = true
 explicit_package_bases = true
 ignore_missing_imports = true
+disable_error_code = ["unused-ignore"]
 
 [[tool.mypy.overrides]]
 module = "alembic.*"

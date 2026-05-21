@@ -1,3 +1,5 @@
+import base64
+
 from common.schemas.ip import IpInfoSchema
 from common.schemas.server import ServerCheckSchema
 
@@ -12,3 +14,13 @@ def merge_server_check_with_ip_info(
     server.server.longitude = ip_info.longitude
     server.server.hostname = ip_info.hostname
     server.server.asn = ip_info.asn
+
+
+def decode_base64(string: str) -> bytes | None:
+    try:
+        if "," in string:
+            string = string.split(",", 1)[1]
+
+        return base64.b64decode(string)
+    except Exception:
+        return None

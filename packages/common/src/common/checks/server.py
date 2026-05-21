@@ -83,7 +83,8 @@ def is_lan(players_online: int, players_max: int, motd: str) -> bool:
 async def check_java_server(ip: str, port: int) -> ServerCheckSchema | None:
     try:
         server = await JavaServer.async_lookup(
-            f"{ip}:{port}", SERVER_CHECK_TIMEOUT
+            f"{ip}:{port}",
+            SERVER_CHECK_TIMEOUT,  # type: ignore
         )
         status = await server.async_status()
     except Exception:
@@ -146,7 +147,7 @@ async def check_java_server(ip: str, port: int) -> ServerCheckSchema | None:
             motd=status.description,
             latency=status.latency,
             protocol=status.version.protocol,
-            favicon=status.icon,
+            icon=status.icon,
             enforcesSecureChat=status.enforces_secure_chat,
             fml_network_version=fml,
             mods_truncated=truncated,
@@ -164,7 +165,7 @@ async def check_java_server(ip: str, port: int) -> ServerCheckSchema | None:
 
 async def check_bedrock_server(ip: str, port: int) -> ServerCheckSchema | None:
     try:
-        server = BedrockServer.lookup(f"{ip}:{port}", SERVER_CHECK_TIMEOUT)
+        server = BedrockServer.lookup(f"{ip}:{port}", SERVER_CHECK_TIMEOUT)  # type: ignore
         status = await server.async_status()
     except Exception:
         return None
@@ -200,7 +201,8 @@ async def check_bedrock_server(ip: str, port: int) -> ServerCheckSchema | None:
 async def check_legacy_server(ip: str, port: int) -> ServerCheckSchema | None:
     try:
         server = await LegacyServer.async_lookup(
-            f"{ip}:{port}", SERVER_CHECK_TIMEOUT
+            f"{ip}:{port}",
+            SERVER_CHECK_TIMEOUT,  # type: ignore
         )
         status = await server.async_status()
     except Exception:

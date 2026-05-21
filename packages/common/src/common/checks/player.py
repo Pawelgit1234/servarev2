@@ -7,10 +7,10 @@ from aiohttp import ClientError
 from common.enums import PlayerType
 from common.schemas.player import PlayerSchema, PlayerSnapshotSchema
 from common.session import session_manager
-from common.settings import PLAYER_SEMAPHORE, SESSION_URL
+from common.settings import MOJANG_SEMAPHORE, SESSION_URL
 from mcstatus.responses import JavaStatusPlayer
 
-s = asyncio.Semaphore(PLAYER_SEMAPHORE)
+s = asyncio.Semaphore(MOJANG_SEMAPHORE)
 
 # No need, because status already includes uuids
 #
@@ -59,7 +59,10 @@ async def fetch_profile(
         return offline
 
     try:
-        async with s, session_manager.session.get(f"{SESSION_URL}{u}") as resp:
+        async with (
+            s,
+            session_manager.session.get(f"{SESSION_URL}/{u}") as resp,
+        ):
             if resp.status != 200:
                 return offline
 
@@ -84,6 +87,16 @@ async def fetch_profile(
         PlayerSchema(uuid=u, player_type=PlayerType.PREMIUM),
         PlayerSnapshotSchema(name=name, skin=skin, cape=cape),
     )
+
+
+async def download_by_url(url: str) -> bytes | None:
+    try:
+        async with s, session_manager.session.get(url) as resp:
+            if resp.status != 200:
+                return None
+            return await resp.read()  # type: ignore
+    except Exception:
+        return None
 
 
 async def fetch_players(

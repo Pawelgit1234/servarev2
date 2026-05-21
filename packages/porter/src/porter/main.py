@@ -104,7 +104,7 @@ def main() -> None:
     logger.info("Starts running")
 
     while True:
-        ips = get_ip_batch(PORTER_BATCH_SIZE)
+        ips = get_ip_batch(PORTER_BATCH_SIZE)  # type: ignore
 
         logger.info(f"{ips} scan start")
         results = scan_ips(ips)
@@ -112,10 +112,7 @@ def main() -> None:
         pipe = rs.pipeline()
 
         for ip, ports in results.items():
-            pipe.rpush(
-                REDIS_IP_QUEUE,
-                f"{REDIS_PORTER_QUEUE} {ports} {ip}",
-            )
+            pipe.rpush(REDIS_IP_QUEUE, f"{ports} {ip}")
 
         pipe.execute()
 

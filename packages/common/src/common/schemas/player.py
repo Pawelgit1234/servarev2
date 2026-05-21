@@ -18,6 +18,6 @@ class PlayerSnapshotSchema(TimestampMixin):  # type: ignore
     cape: str | None = None
 
 
-class PlayerSessionSchema(BaseModel):
+class PlayerSessionSchema(BaseModel):  # type: ignore
     from_: datetime
     to: datetime | None = None

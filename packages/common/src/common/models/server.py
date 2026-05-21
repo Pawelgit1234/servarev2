@@ -196,7 +196,7 @@ class ServerSnapshotModel(Base, TimestampMixin):  # type: ignore
 
     # Java
     protocol: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    favicon: Mapped[str | None] = mapped_column(
+    icon: Mapped[str | None] = mapped_column(
         String(32), nullable=True, index=True
     )  # hash
     enforcesSecureChat: Mapped[bool | None] = mapped_column(

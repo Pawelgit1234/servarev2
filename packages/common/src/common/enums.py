@@ -13,6 +13,12 @@ class ServerType(Enum):
     BEDROCK = "bedrock"
 
 
+class AssetField(Enum):
+    ICON = "icon"
+    SKIN = "skin"
+    CAPE = "cape"
+
+
 class ProtocolType(Enum):
     TCP = "tcp"
     UDP = "udp"

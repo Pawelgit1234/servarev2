@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 from contextlib import asynccontextmanager
@@ -8,7 +9,6 @@ from botocore.exceptions import ClientError
 from common.settings import (
     S3_BUCKET,
     S3_ENDPOINT,
-    S3_GLOBAL_ENDPOINT,
     S3_PUBLIC_READ_POLICY,
     S3_ROOT_PASSWORD,
     S3_ROOT_USER,
@@ -29,8 +29,12 @@ class S3Client:
             "endpoint_url": endpoint_url,
             "region_name": "us-east-1",
         }
+
         self.bucket_name = bucket_name
         self.session = get_session()
+
+        self._bucket_ready = False
+        self._bucket_lock = asyncio.Lock()
 
     @asynccontextmanager
     async def get_client(self):  # type: ignore
@@ -38,16 +42,22 @@ class S3Client:
             yield client
 
     async def ensure_bucket_exists(self) -> None:
-        async with self.get_client() as client:
-            try:
-                await client.head_bucket(Bucket=self.bucket_name)
-            except ClientError:
-                await client.create_bucket(Bucket=self.bucket_name)
+        if self._bucket_ready:
+            return
 
-                await client.put_bucket_policy(
-                    Bucket=self.bucket_name,
-                    Policy=json.dumps(S3_PUBLIC_READ_POLICY),
-                )
+        async with self._bucket_lock:
+            async with self.get_client() as client:
+                try:
+                    await client.head_bucket(Bucket=self.bucket_name)
+                except ClientError:
+                    await client.create_bucket(Bucket=self.bucket_name)
+
+                    await client.put_bucket_policy(
+                        Bucket=self.bucket_name,
+                        Policy=json.dumps(S3_PUBLIC_READ_POLICY),
+                    )
+
+            self._bucket_ready = True
 
     async def file_exists(self, key: str) -> bool:
         async with self.get_client() as client:
@@ -71,12 +81,10 @@ class S3Client:
             object_name = hashlib.md5(data).hexdigest()
 
         key = f"{prefix}/{object_name}"
-        full_url = f"{S3_GLOBAL_ENDPOINT}/{self.bucket_name}/{key}"
 
-        if deduplicate:
-            exists = await self.file_exists(key)
-            if exists:
-                return full_url
+        if deduplicate:  # noqa: SIM102
+            if await self.file_exists(key):
+                return object_name
 
         async with self.get_client() as client:
             await client.put_object(
@@ -86,12 +94,12 @@ class S3Client:
                 ContentType=content_type,
             )
 
-        return full_url
+        return object_name
 
 
 s3 = S3Client(
-    access_key=S3_ROOT_USER,
-    secret_key=S3_ROOT_PASSWORD,
+    access_key=S3_ROOT_USER,  # type: ignore
+    secret_key=S3_ROOT_PASSWORD,  # type: ignore
     endpoint_url=S3_ENDPOINT,
     bucket_name=S3_BUCKET,
 )
