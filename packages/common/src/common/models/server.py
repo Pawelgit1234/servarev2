@@ -81,33 +81,29 @@ class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
     asn: Mapped[str | None] = mapped_column(String(ASN_MAX), nullable=True)
 
     # relationships
-    server_sessions: Mapped[list["ServerSessionModel"]] = relationship(
+    sessions: Mapped[list["ServerSessionModel"]] = relationship(
         back_populates="server",
         cascade="all, delete-orphan",
     )
-    server_snapshots: Mapped[list["ServerSnapshotModel"]] = relationship(
+    snapshots: Mapped[list["ServerSnapshotModel"]] = relationship(
         back_populates="server",
         cascade="all, delete-orphan",
     )
-    server_dynamic_snapshots: Mapped[list["ServerDynamicSnapshotModel"]] = (
+    dynamic_snapshots: Mapped[list["ServerDynamicSnapshotModel"]] = (
         relationship(
             back_populates="server",
             cascade="all, delete-orphan",
         )
     )
-    server_bot_snapshots: Mapped[list["ServerBotSnapshotModel"]] = (
-        relationship(
-            back_populates="server",
-            cascade="all, delete-orphan",
-        )
+    bot_snapshots: Mapped[list["ServerBotSnapshotModel"]] = relationship(
+        back_populates="server",
+        cascade="all, delete-orphan",
     )
-    server_players: Mapped[list["ServerPlayerAssociationModel"]] = (
-        relationship(
-            back_populates="server",
-            cascade="all, delete-orphan",
-        )
+    players: Mapped[list["ServerPlayerAssociationModel"]] = relationship(
+        back_populates="server",
+        cascade="all, delete-orphan",
     )
-    server_ports: Mapped[list["ServerPortAssociationModel"]] = relationship(
+    ports: Mapped[list["ServerPortAssociationModel"]] = relationship(
         back_populates="server",
         cascade="all, delete-orphan",
     )
@@ -123,9 +119,7 @@ class ServerSessionModel(Base):  # type: ignore
         nullable=False,
         index=True,
     )
-    server: Mapped["ServerModel"] = relationship(
-        back_populates="server_sessions"
-    )
+    server: Mapped["ServerModel"] = relationship(back_populates="sessions")
 
     from_: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -173,7 +167,7 @@ class ServerPortAssociationModel(Base, TimestampMixin):  # type: ignore
         primary_key=True,
     )
     server: Mapped["ServerModel"] = relationship(
-        back_populates="server_ports",
+        back_populates="ports",
     )
 
     server_port_id: Mapped[int] = mapped_column(
@@ -203,9 +197,7 @@ class ServerSnapshotModel(Base, TimestampMixin):  # type: ignore
         nullable=False,
         index=True,
     )
-    server: Mapped["ServerModel"] = relationship(
-        back_populates="server_snapshots"
-    )
+    server: Mapped["ServerModel"] = relationship(back_populates="snapshots")
 
     # Common
     version: Mapped[str] = mapped_column(
@@ -243,13 +235,13 @@ class ServerSnapshotModel(Base, TimestampMixin):  # type: ignore
     plugin_associations: Mapped[
         list["ServerSnapshotPluginAssociationModel"]
     ] = relationship(
-        back_populates="server_snapshot",
+        back_populates="snapshot",
         cascade="all, delete-orphan",
     )
 
     mod_associations: Mapped[list["ServerSnapshotModAssociationModel"]] = (
         relationship(
-            back_populates="server_snapshot",
+            back_populates="snapshot",
             cascade="all, delete-orphan",
         )
     )
@@ -259,7 +251,7 @@ class ServerSnapshotModel(Base, TimestampMixin):  # type: ignore
         index=True,
     )
     software: Mapped["SoftwareModel"] = relationship(
-        back_populates="server_snapshots",
+        back_populates="snapshots",
     )
 
 
@@ -281,7 +273,7 @@ class ServerDynamicSnapshotModel(Base, TimestampMixin):  # type: ignore
         index=True,
     )
     server: Mapped["ServerModel"] = relationship(
-        back_populates="server_dynamic_snapshots"
+        back_populates="dynamic_snapshots"
     )
 
     players_online: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -305,7 +297,7 @@ class ServerBotSnapshotModel(Base, TimestampMixin):  # type: ignore
         index=True,
     )
     server: Mapped["ServerModel"] = relationship(
-        back_populates="server_bot_snapshots"
+        back_populates="bot_snapshots"
     )
 
     subchunks: Mapped[list["SubchunkModel"]] = relationship(

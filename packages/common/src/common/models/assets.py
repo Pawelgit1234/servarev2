@@ -35,7 +35,7 @@ class SoftwareModel(Base, TimestampMixin):  # type: ignore
         String(SOFTWARE_VESION_MAX), nullable=False
     )
 
-    server_snapshots: Mapped[list["ServerSnapshotModel"]] = relationship(
+    snapshots: Mapped[list["ServerSnapshotModel"]] = relationship(
         back_populates="software",
     )
 
@@ -102,15 +102,15 @@ class PluginModel(Base, TimestampMixin):  # type: ignore
 class ServerSnapshotPluginAssociationModel(Base, TimestampMixin):  # type: ignore
     __tablename__ = "server_snapshot_plugin_associations"
     __table_args__ = (
-        Index("ix_ss_plugin_snapshot_id", "server_snapshot_id"),
+        Index("ix_ss_plugin_snapshot_id", "snapshot_id"),
         Index("ix_ss_plugin_plugin_id", "plugin_id"),
     )
 
-    server_snapshot_id: Mapped[int] = mapped_column(
+    snapshot_id: Mapped[int] = mapped_column(
         ForeignKey("server_snapshots.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    server_snapshot: Mapped["ServerSnapshotModel"] = relationship(
+    snapshot: Mapped["ServerSnapshotModel"] = relationship(
         back_populates="plugin_associations",
     )
 
@@ -155,15 +155,15 @@ class ModModel(Base, TimestampMixin):  # type: ignore
 class ServerSnapshotModAssociationModel(Base, TimestampMixin):  # type: ignore
     __tablename__ = "server_snapshot_mod_associations"
     __table_args__ = (
-        Index("ix_ss_mod_snapshot_id", "server_snapshot_id"),
+        Index("ix_ss_mod_snapshot_id", "snapshot_id"),
         Index("ix_ss_mod_mod_id", "mod_id"),
     )
 
-    server_snapshot_id: Mapped[int] = mapped_column(
+    snapshot_id: Mapped[int] = mapped_column(
         ForeignKey("server_snapshots.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    server_snapshot: Mapped["ServerSnapshotModel"] = relationship(
+    snapshot: Mapped["ServerSnapshotModel"] = relationship(
         back_populates="mod_associations",
     )
 

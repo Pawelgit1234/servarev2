@@ -28,19 +28,17 @@ class PlayerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
         nullable=False
     )  # not unique because of offline players
 
-    player_snapshots: Mapped[list["PlayerSnapshotModel"]] = relationship(
+    snapshots: Mapped[list["PlayerSnapshotModel"]] = relationship(
         back_populates="player",
         cascade="all, delete-orphan",
     )
-    player_sessions: Mapped[list["PlayerSessionModel"]] = relationship(
+    sessions: Mapped[list["PlayerSessionModel"]] = relationship(
         back_populates="player",
         cascade="all, delete-orphan",
     )
-    player_servers: Mapped[list["ServerPlayerAssociationModel"]] = (
-        relationship(
-            back_populates="player",
-            cascade="all, delete-orphan",
-        )
+    servers: Mapped[list["ServerPlayerAssociationModel"]] = relationship(
+        back_populates="player",
+        cascade="all, delete-orphan",
     )
 
 
@@ -56,14 +54,14 @@ class ServerPlayerAssociationModel(Base, TimestampMixin, LastSeenMixin):  # type
         primary_key=True,
     )
     server: Mapped["ServerModel"] = relationship(
-        back_populates="server_players",
+        back_populates="players",
     )
     player_id: Mapped[int] = mapped_column(
         ForeignKey("players.id", ondelete="CASCADE"),
         primary_key=True,
     )
     player: Mapped["PlayerModel"] = relationship(
-        back_populates="player_servers",
+        back_populates="servers",
     )
 
 
@@ -80,9 +78,7 @@ class PlayerSnapshotModel(Base, TimestampMixin):  # type: ignore
         ForeignKey("players.id", ondelete="CASCADE"),
         index=True,
     )
-    player: Mapped["PlayerModel"] = relationship(
-        back_populates="player_snapshots"
-    )
+    player: Mapped["PlayerModel"] = relationship(back_populates="snapshots")
 
     name: Mapped[str] = mapped_column(
         String(USERNAME_MAX), nullable=False
@@ -100,9 +96,7 @@ class PlayerSessionModel(Base):  # type: ignore
         ForeignKey("players.id", ondelete="CASCADE"),
         index=True,
     )
-    player: Mapped["PlayerModel"] = relationship(
-        back_populates="player_sessions"
-    )
+    player: Mapped["PlayerModel"] = relationship(back_populates="sessions")
 
     from_: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
