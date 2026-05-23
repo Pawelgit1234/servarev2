@@ -11,13 +11,13 @@ check:
 	lint type
 
 migrate:
-	docker compose run --rm migrator alembic revision --autogenerate -m "$(name)"
+	docker compose run --rm --build migrator alembic revision --autogenerate -m "$(name)"
 
 upgrade:
-	docker compose run --rm migrator alembic upgrade head
+	docker compose run --rm --build migrator alembic upgrade head
 
 downgrade:
-	docker compose run --rm migrator alembic downgrade -1
+	docker compose run --rm --build migrator alembic downgrade -1
 
 test:
-	docker compose run --rm tester
+	docker compose run --rm --build tester

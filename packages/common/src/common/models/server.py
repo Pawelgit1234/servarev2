@@ -4,6 +4,17 @@ from typing import TYPE_CHECKING
 from common.base import Base
 from common.enums import DetectedServiceType, ProtocolType, ServerType
 from common.models.mixins import LastSeenMixin, TimestampMixin
+from common.settings import (
+    ASN_MAX,
+    CITY_MAX,
+    COUNTRY_MAX,
+    HOSTNAME_MAX,
+    REGION_MAX,
+    SERVER_GAMEMODE_MAX,
+    SERVER_MAP_NAME_MAX,
+    SERVER_MOTD_MAX,
+    SERVER_VERSION_MAX,
+)
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -53,34 +64,42 @@ class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
     )
 
     # Geo
-    country: Mapped[str | None] = mapped_column(String(2), nullable=True)
-    region: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    country: Mapped[str | None] = mapped_column(
+        String(COUNTRY_MAX), nullable=True
+    )
+    region: Mapped[str | None] = mapped_column(
+        String(REGION_MAX), nullable=True
+    )
+    city: Mapped[str | None] = mapped_column(String(CITY_MAX), nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Other IP stuff
-    hostname: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    asn: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    hostname: Mapped[str | None] = mapped_column(
+        String(HOSTNAME_MAX), nullable=True
+    )
+    asn: Mapped[str | None] = mapped_column(String(ASN_MAX), nullable=True)
 
     # relationships
     server_sessions: Mapped[list["ServerSessionModel"]] = relationship(
         back_populates="server",
         cascade="all, delete-orphan",
     )
-    snapshots: Mapped[list["ServerSnapshotModel"]] = relationship(
+    server_snapshots: Mapped[list["ServerSnapshotModel"]] = relationship(
         back_populates="server",
         cascade="all, delete-orphan",
     )
-    dynamic_snapshots: Mapped[list["ServerDynamicSnapshotModel"]] = (
+    server_dynamic_snapshots: Mapped[list["ServerDynamicSnapshotModel"]] = (
         relationship(
             back_populates="server",
             cascade="all, delete-orphan",
         )
     )
-    bot_snapshots: Mapped[list["ServerBotSnapshotModel"]] = relationship(
-        back_populates="server",
-        cascade="all, delete-orphan",
+    server_bot_snapshots: Mapped[list["ServerBotSnapshotModel"]] = (
+        relationship(
+            back_populates="server",
+            cascade="all, delete-orphan",
+        )
     )
     server_players: Mapped[list["ServerPlayerAssociationModel"]] = (
         relationship(
@@ -189,9 +208,11 @@ class ServerSnapshotModel(Base, TimestampMixin):  # type: ignore
     )
 
     # Common
-    version: Mapped[str] = mapped_column(String(32), nullable=False)
+    version: Mapped[str] = mapped_column(
+        String(SERVER_VERSION_MAX), nullable=False
+    )
     players_max: Mapped[int] = mapped_column(Integer, nullable=False)
-    motd: Mapped[str] = mapped_column(String(512), nullable=False)
+    motd: Mapped[str] = mapped_column(String(SERVER_MOTD_MAX), nullable=False)
     latency: Mapped[float] = mapped_column(Float, nullable=False)
 
     # Java
@@ -210,10 +231,14 @@ class ServerSnapshotModel(Base, TimestampMixin):  # type: ignore
     mods_truncated: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     # Query / Bedrock
-    map_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    map_name: Mapped[str | None] = mapped_column(
+        String(SERVER_MAP_NAME_MAX), nullable=True
+    )
 
     # Bedrock
-    gamemode: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    gamemode: Mapped[str | None] = mapped_column(
+        String(SERVER_GAMEMODE_MAX), nullable=True
+    )
 
     plugin_associations: Mapped[
         list["ServerSnapshotPluginAssociationModel"]
@@ -284,7 +309,7 @@ class ServerBotSnapshotModel(Base, TimestampMixin):  # type: ignore
     )
 
     subchunks: Mapped[list["SubchunkModel"]] = relationship(
-        back_populates="server_bot_snapshot",
+        back_populates="bot_snapshot",
         cascade="all, delete-orphan",
     )
 

@@ -86,13 +86,17 @@ class S3Client:
             if await self.file_exists(key):
                 return object_name
 
+        params = {
+            "Bucket": self.bucket_name,
+            "Key": key,
+            "Body": data,
+        }
+
+        if content_type is not None:
+            params["ContentType"] = content_type
+
         async with self.get_client() as client:
-            await client.put_object(
-                Bucket=self.bucket_name,
-                Key=key,
-                Body=data,
-                ContentType=content_type,
-            )
+            await client.put_object(**params)
 
         return object_name
 

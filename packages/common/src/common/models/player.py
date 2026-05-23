@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from common.base import Base
 from common.enums import PlayerType
 from common.models.mixins import LastSeenMixin, TimestampMixin
+from common.settings import USERNAME_MAX
 from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -84,7 +85,7 @@ class PlayerSnapshotModel(Base, TimestampMixin):  # type: ignore
     )
 
     name: Mapped[str] = mapped_column(
-        String(16), nullable=False
+        String(USERNAME_MAX), nullable=False
     )  # not unique because of offline players
     skin: Mapped[str | None] = mapped_column(String(32), nullable=True)  # hash
     cape: Mapped[str | None] = mapped_column(String(32), nullable=True)  # hash

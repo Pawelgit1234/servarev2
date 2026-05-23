@@ -6,6 +6,7 @@ RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml uv.lock ./
 COPY packages/common ./packages/common
+RUN find . -type d \( -name tests -o -name __pycache__ \) -exec rm -rf {} +
 COPY alembic ./alembic
 COPY alembic.ini ./
 

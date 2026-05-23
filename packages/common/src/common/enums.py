@@ -41,3 +41,34 @@ class DetectedServiceType(Enum):
     # Other
     GENERIC_HTTP = "generic_http"
     UNKNOWN = "unknown"
+
+
+class ServerSoftwareType(Enum):
+    VANILLA = "vanilla"
+
+    FORGE = "forge"
+    FABRIC = "fabric"
+    QUILT = "quilt"
+    NEOFORGE = "neoforge"
+
+    PAPER = "paper"
+    PURPUR = "purpur"
+    PUFFERFISH = "pufferfish"
+    TUINITY = "tuinity"
+    AIRPLANE = "airplane"
+    SPIGOT = "spigot"
+    CRAFTBUKKIT = "craftbukkit"
+    BUKKIT = "bukkit"
+
+    VELOCITY = "velocity"
+    WATERFALL = "waterfall"
+    BUNGEE = "bungee"
+
+    SPONGE = "sponge"
+    SPONGEFORGE = "spongeforge"
+    SPONGEVANILLA = "spongevanilla"
+
+    ARCLIGHT = "arclight"
+    MOHIST = "mohist"
+    MAGMA = "magma"
+    CATSERVER = "catserver"

@@ -1,8 +1,9 @@
+from common.enums import ServerSoftwareType
 from common.schemas.mixins import TimestampMixin
 
 
 class SoftwareSchema(TimestampMixin):  # type: ignore
-    name: str
+    name: ServerSoftwareType
     version: str
 
 

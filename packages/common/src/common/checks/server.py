@@ -2,7 +2,7 @@ import logging
 import re
 
 from common.checks.player import fetch_players
-from common.enums import ServerType
+from common.enums import ServerSoftwareType, ServerType
 from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
 from common.schemas.server import (
     ServerCheckSchema,
@@ -24,48 +24,52 @@ for name in (
 ):
     logging.getLogger(name).setLevel(logging.CRITICAL)
 
+DETECTION_ORDER: tuple[ServerSoftwareType, ...] = (
+    ServerSoftwareType.FABRIC,
+    ServerSoftwareType.QUILT,
+    ServerSoftwareType.NEOFORGE,
+    ServerSoftwareType.VELOCITY,
+    ServerSoftwareType.WATERFALL,
+    ServerSoftwareType.BUNGEE,
+    ServerSoftwareType.PAPER,
+    ServerSoftwareType.PURPUR,
+    ServerSoftwareType.PUFFERFISH,
+    ServerSoftwareType.TUINITY,
+    ServerSoftwareType.AIRPLANE,
+    ServerSoftwareType.SPIGOT,
+    ServerSoftwareType.CRAFTBUKKIT,
+    ServerSoftwareType.BUKKIT,
+    ServerSoftwareType.SPONGE,
+    ServerSoftwareType.SPONGEFORGE,
+    ServerSoftwareType.SPONGEVANILLA,
+    ServerSoftwareType.ARCLIGHT,
+    ServerSoftwareType.MOHIST,
+    ServerSoftwareType.MAGMA,
+    ServerSoftwareType.CATSERVER,
+)
 
-def detect_server_software(status: JavaStatusResponse) -> str:
+
+def detect_server_software(data: str) -> ServerSoftwareType:
+    for software in DETECTION_ORDER:
+        if software.value in data:
+            return software
+
+    return ServerSoftwareType.VANILLA
+
+
+def detect_server_software_by_status(
+    status: JavaStatusResponse,
+) -> ServerSoftwareType:
     raw = status.raw
     name = status.version.name.lower()
     motd = status.description.lower()
 
     full = f"{name} {motd}"
 
-    checks = [
-        "fabric",
-        "quilt",
-        "neoforge",
-        "velocity",
-        "waterfall",
-        "bungee",
-        "paper",
-        "purpur",
-        "pufferfish",
-        "tuinity",
-        "airplane",
-        "spigot",
-        "craftbukkit",
-        "bukkit",
-        "sponge",
-        "spongeforge",
-        "spongevanilla",
-        "arclight",
-        "mohist",
-        "magma",
-        "catserver",
-        "geyser",
-        "floodgate",
-    ]
-
     if "modinfo" in raw:
-        return "forge"
+        return ServerSoftwareType.FORGE
 
-    for software in checks:
-        if software in full:
-            return software
-
-    return "vanilla"
+    return detect_server_software(full)
 
 
 def is_lan(players_online: int, players_max: int, motd: str) -> bool:
@@ -117,14 +121,14 @@ async def check_java_server(ip: str, port: int) -> ServerCheckSchema | None:
     if query:
         plugins = [PluginSchema(name=name) for name in query.software.plugins]
         software = SoftwareSchema(
-            name=query.software.brand,
+            name=detect_server_software(query.software.brand),
             version=query.software.version,
         )
         map_name = query.map_name
     else:
         plugins = []
         software = SoftwareSchema(
-            name=detect_server_software(status),
+            name=detect_server_software_by_status(status),
             version=status.version.name,
         )
         map_name = None
@@ -190,7 +194,7 @@ async def check_bedrock_server(ip: str, port: int) -> ServerCheckSchema | None:
         ),
         players={},
         software=SoftwareSchema(
-            name="bedrock",
+            name=ServerSoftwareType.VANILLA,
             version=status.version.name,
         ),
         mods=[],
@@ -231,7 +235,7 @@ async def check_legacy_server(ip: str, port: int) -> ServerCheckSchema | None:
         ),
         players={},
         software=SoftwareSchema(
-            name="legacy",
+            name=ServerSoftwareType.VANILLA,
             version=status.version.name,
         ),
         mods=[],

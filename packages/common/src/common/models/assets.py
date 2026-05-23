@@ -1,8 +1,16 @@
 from typing import TYPE_CHECKING
 
 from common.base import Base
+from common.enums import ServerSoftwareType
 from common.models.mixins import TimestampMixin
-from sqlalchemy import ForeignKey, Index, String
+from common.settings import (
+    MOD_NAME_MAX,
+    MOD_VERSION_MAX,
+    PLUGIN_NAME_MAX,
+    RESOURCE_PACK_URL_MAX,
+    SOFTWARE_VESION_MAX,
+)
+from sqlalchemy import Enum, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -20,8 +28,12 @@ class SoftwareModel(Base, TimestampMixin):  # type: ignore
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(32), nullable=False)
-    version: Mapped[str] = mapped_column(String(32), nullable=False)
+    name: Mapped[ServerSoftwareType] = mapped_column(
+        Enum(ServerSoftwareType), nullable=False
+    )
+    version: Mapped[str] = mapped_column(
+        String(SOFTWARE_VESION_MAX), nullable=False
+    )
 
     server_snapshots: Mapped[list["ServerSnapshotModel"]] = relationship(
         back_populates="software",
@@ -33,7 +45,9 @@ class ResourcePackModel(Base, TimestampMixin):  # type: ignore
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    url: Mapped[str] = mapped_column(String(512), unique=True)
+    url: Mapped[str] = mapped_column(
+        String(RESOURCE_PACK_URL_MAX), unique=True
+    )
     hash: Mapped[str] = mapped_column(String(64))
 
     bot_snapshot_associations: Mapped[
@@ -73,7 +87,9 @@ class PluginModel(Base, TimestampMixin):  # type: ignore
     __table_args__ = (Index("ix_plugins_name", "name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(
+        String(PLUGIN_NAME_MAX), nullable=False, unique=True
+    )
 
     snapshot_associations: Mapped[
         list["ServerSnapshotPluginAssociationModel"]
@@ -116,8 +132,10 @@ class ModModel(Base, TimestampMixin):  # type: ignore
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    name: Mapped[str] = mapped_column(String(32), nullable=False)
-    version: Mapped[str] = mapped_column(String(32), nullable=False)
+    name: Mapped[str] = mapped_column(String(MOD_NAME_MAX), nullable=False)
+    version: Mapped[str] = mapped_column(
+        String(MOD_VERSION_MAX), nullable=False
+    )
 
     snapshot_associations: Mapped[
         list["ServerSnapshotModAssociationModel"]
