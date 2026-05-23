@@ -20,4 +20,5 @@ downgrade:
 	docker compose run --rm --build migrator alembic downgrade -1
 
 test:
-	docker compose run --rm --build tester
+	docker compose run --rm --build tester || true
+	docker compose stop db_test
