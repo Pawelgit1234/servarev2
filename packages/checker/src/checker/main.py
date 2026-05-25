@@ -4,7 +4,7 @@ import logging
 from common.databases import engine, ra
 from common.logger import setup_logging
 from common.session import session_manager
-from common.settings import CHECK_CONCURRENCY, REDIS_IP_QUEUE
+from common.settings import CHECKER_CONCURRENCY, REDIS_IP_QUEUE
 
 from checker.handlers import handle_masscan, handle_porter
 
@@ -25,12 +25,15 @@ async def worker() -> None:
 async def main() -> None:
     logger.info("Starts running")
     session_manager.init()
-    workers = [asyncio.create_task(worker()) for _ in range(CHECK_CONCURRENCY)]  # type: ignore
+    workers = [
+        worker()
+        for _ in range(CHECKER_CONCURRENCY)  # type: ignore
+    ]
 
     try:
         await asyncio.gather(*workers)
     finally:
-        logger.info("Shuting down")
+        logger.info("Shutting down")
         await engine.dispose()
         await ra.aclose()
         await session_manager.close()

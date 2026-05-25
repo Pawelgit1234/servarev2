@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from common.enums import (
     AssetField,
@@ -10,7 +10,7 @@ from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
 from common.schemas.ip import IpInfoSchema
 from common.schemas.mixins import LastSeenMixin, TimestampMixin
 from common.schemas.player import PlayerSchema, PlayerSnapshotSchema
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ServerSchema(IpInfoSchema, TimestampMixin, LastSeenMixin):  # type: ignore
@@ -19,6 +19,13 @@ class ServerSchema(IpInfoSchema, TimestampMixin, LastSeenMixin):  # type: ignore
     server_type: ServerType
     is_lan: bool
     is_multiport: bool = False
+
+    last_ip_check_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC)
+    )
+    last_porter_check_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC)
+    )
 
 
 class ServerPortSchema(BaseModel):  # type: ignore

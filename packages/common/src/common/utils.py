@@ -1,4 +1,5 @@
 import base64
+from datetime import datetime, timedelta
 
 from common.schemas.ip import IpInfoSchema
 from common.schemas.server import ServerCheckSchema
@@ -23,6 +24,9 @@ from common.settings import (
 def merge_server_check_with_ip_info(
     server: ServerCheckSchema, ip_info: IpInfoSchema
 ) -> None:
+    if ip_info.country is None:  # defends from overwriting current ip_info
+        return
+
     server.server.country = ip_info.country
     server.server.region = ip_info.region
     server.server.city = ip_info.city
@@ -40,6 +44,12 @@ def decode_base64(string: str) -> bytes | None:
         return base64.b64decode(string)
     except Exception:
         return None
+
+
+def has_expired(timestamp: datetime, delta: int) -> bool:
+    return datetime.now() > (  # type: ignore
+        timestamp + timedelta(days=delta)
+    )
 
 
 def _truncate(value: str | None, limit: int) -> str | None:

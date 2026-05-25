@@ -10,12 +10,12 @@ from common.checks.server import (
 from common.enums import DetectedServiceType, ProtocolType
 from common.schemas.server import ServerCheckSchema, ServerPortSchema
 from common.session import session_manager
-from common.settings import PORT_CHECK_CONCURRENCY
+from common.settings import CHECKER_PORT_CONCURRENCY
 from common.utils import merge_server_check_with_ip_info
 
 from checker.schemas import MasscanAddressSchema, PorterSchema
 
-s = asyncio.Semaphore(PORT_CHECK_CONCURRENCY)  # type: ignore
+s = asyncio.Semaphore(CHECKER_PORT_CONCURRENCY)  # type: ignore
 
 
 async def check_server_by_protocol(
@@ -163,8 +163,9 @@ async def check_server_ports(
 ) -> tuple[list[ServerPortSchema], list[ServerCheckSchema]]:
     ports, servers = await scan_ports(ports, ip)  # type: ignore
 
-    ip_info = await get_ip_info(ip)
-    for server in servers:
-        merge_server_check_with_ip_info(server, ip_info)
+    if len(servers) != 0:
+        ip_info = await get_ip_info(ip)
+        for server in servers:
+            merge_server_check_with_ip_info(server, ip_info)
 
     return ports, servers  # type: ignore

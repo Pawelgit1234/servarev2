@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 members = [
     "checker",
     "common",
+    "monitor",
     "porter",
     "scanner",
     "servarev2",
@@ -746,6 +747,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/08/31/758e0cb07da3f6200
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6f/d5/a66cb21932e74e729ab03529c06ab0ee889d1191d2ef7f338601e03d59a4/mcstatus-13.0.1-py3-none-any.whl", hash = "sha256:52394fb189aeccca31fe19ebdcb1669063e4757aeac0526ce9569826eddf7d33", size = 56132, upload-time = "2026-03-30T17:07:02.562Z" },
 ]
+
+[[package]]
+name = "monitor"
+version = "0.1.0"
+source = { editable = "packages/monitor" }
+dependencies = [
+    { name = "common" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "common", editable = "packages/common" }]
 
 [[package]]
 name = "multidict"

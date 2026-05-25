@@ -241,17 +241,3 @@ async def check_legacy_server(ip: str, port: int) -> ServerCheckSchema | None:
         mods=[],
         plugins=[],
     )
-
-
-CHECKERS = {
-    ServerType.JAVA: check_java_server,
-    ServerType.BEDROCK: check_bedrock_server,
-    ServerType.LEGACY: check_legacy_server,
-}
-
-
-async def check_server_by_type(
-    ip: str, port: int, server_type: ServerType
-) -> ServerCheckSchema | None:
-    checker = CHECKERS[server_type]
-    return await checker(ip, port)

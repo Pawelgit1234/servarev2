@@ -59,7 +59,10 @@ class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
         Enum(ServerType), nullable=False
     )
 
-    last_deep_check_at: Mapped[datetime] = mapped_column(
+    last_ip_check_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_porter_check_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
