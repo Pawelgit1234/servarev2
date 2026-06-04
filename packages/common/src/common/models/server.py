@@ -26,7 +26,6 @@ from sqlalchemy import (
     String,
     func,
 )
-from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -37,7 +36,7 @@ if TYPE_CHECKING:
         ServerSnapshotPluginAssociationModel,
         SoftwareModel,
     )
-    from common.models.player import ServerPlayerAssociationModel
+    from common.models.player import PlayerSessionModel
 
 
 class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
@@ -51,7 +50,7 @@ class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    ip: Mapped[str] = mapped_column(INET, nullable=False)
+    ip: Mapped[str] = mapped_column(String, nullable=False)
     port: Mapped[int] = mapped_column(Integer, nullable=False)
     is_lan: Mapped[bool] = mapped_column(Boolean, nullable=False)
     is_multiport: Mapped[bool] = mapped_column(Boolean, nullable=False)
@@ -102,7 +101,7 @@ class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
         back_populates="server",
         cascade="all, delete-orphan",
     )
-    players: Mapped[list["ServerPlayerAssociationModel"]] = relationship(
+    player_sessions: Mapped[list["PlayerSessionModel"]] = relationship(
         back_populates="server",
         cascade="all, delete-orphan",
     )

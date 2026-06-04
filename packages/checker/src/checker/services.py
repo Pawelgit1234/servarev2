@@ -9,7 +9,6 @@ from common.models.player import (
     PlayerModel,
     PlayerSessionModel,
     PlayerSnapshotModel,
-    ServerPlayerAssociationModel,
 )
 from common.models.server import (
     ServerDynamicSnapshotModel,
@@ -98,13 +97,7 @@ async def save_non_existing_server(
         )
         db.add(player_snapshot)
 
-        association = ServerPlayerAssociationModel(
-            server=server,
-            player=player,
-        )
-        db.add(association)
-
-        player_session = PlayerSessionModel(player=player)
+        player_session = PlayerSessionModel(server=server, player=player)
         db.add(player_session)
 
     # Assets
@@ -197,10 +190,10 @@ async def save_ports(
 
     for server_data in servers:
         server_key = (server_data.server.ip, server_data.server.port)
-
         server = existing_servers_map.get(server_key)
 
         if server is None:
+            # TODO: save server properly
             server = ServerModel(
                 ip=server_data.server.ip,
                 port=server_data.server.port,
@@ -215,7 +208,6 @@ async def save_ports(
                 hostname=server_data.server.hostname,
                 asn=server_data.server.asn,
             )
-
             db.add(server)
 
         all_servers.append(server)

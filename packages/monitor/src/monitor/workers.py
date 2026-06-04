@@ -11,11 +11,7 @@ from common.settings import (
     PORTER_CHECK_INTERVAL_DAYS,
     REDIS_PORTER_QUEUE,
 )
-from common.utils import (
-    has_expired,
-    merge_server_check_with_ip_info,
-    normilize_server_check,
-)
+from common.utils import has_expired, normilize_server_check
 
 from monitor.checks import check_servers
 from monitor.services import get_next_server_group, save_servers
@@ -32,40 +28,54 @@ async def server_worker() -> None:
     while True:
         async with async_session() as db:  # type: ignore
             server_models = await get_next_server_group(db)
-            servers = await check_servers(server_models)
-            s = server_models[0]
+            server_checks = await check_servers(server_models)
+
+            # just one of the servers
+            server = server_models[0] if server_models else None
+            if server is None:
+                continue
 
             need_ip_info = has_expired(
-                s.last_ip_check_at,
+                server.last_ip_check_at,
                 IP_CHECK_INTERVAL_DAYS,  # type: ignore
             )
 
             # TODO: break in functions
 
             ip_info = IpInfoSchema()
-            update_ip_timestamp = False
-            update_porter_timestamp = False
+            update_ip = False
+            update_porter = False
 
             if need_ip_info:
-                ip_info = await get_ip_info(s.ip)
-                update_ip_timestamp = True
+                ip_info = await get_ip_info(server.ip)
+                update_ip = True
 
-            server_checks: list[ServerCheckSchema] = []
-            for _, check in servers:
-                merge_server_check_with_ip_info(check, ip_info)
+            active_server_checks: list[ServerCheckSchema] = []
+            for _, check in server_checks:
+                if check is None:
+                    continue
+
                 normilize_server_check(check)
-                server_checks.append(check)
+                active_server_checks.append(check)
 
-            await upload_servers(server_checks)
+            await upload_servers(active_server_checks)
 
             if (
-                has_expired(s.last_porter_check_at, PORTER_CHECK_INTERVAL_DAYS)  # type: ignore
-                and not s.is_multiport
+                has_expired(
+                    server.last_porter_check_at,
+                    PORTER_CHECK_INTERVAL_DAYS,  # type: ignore
+                )
+                and not server.is_multiport
             ):
-                await ra.rpush(REDIS_PORTER_QUEUE, s.ip)  # type: ignore
-                update_porter_timestamp = True
+                await ra.rpush(REDIS_PORTER_QUEUE, server.ip)  # type: ignore
+                update_porter = True
 
             await save_servers(
-                db, servers, update_ip_timestamp, update_porter_timestamp
+                db, server_checks, ip_info, update_ip, update_porter
             )
             await db.commit()
+
+            log = "Servers were checked:"
+            for s in server_models:
+                log += f" {s.ip}:{s.port},"
+            logger.info(log)

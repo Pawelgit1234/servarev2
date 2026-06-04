@@ -36,33 +36,33 @@ class PlayerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
         back_populates="player",
         cascade="all, delete-orphan",
     )
-    servers: Mapped[list["ServerPlayerAssociationModel"]] = relationship(
-        back_populates="player",
-        cascade="all, delete-orphan",
-    )
 
 
-class ServerPlayerAssociationModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
-    __tablename__ = "server_player_associations"
-    __table_args__ = (
-        Index("ix_server_player_associations_player_id", "player_id"),
-        Index("ix_server_player_associations_created_at", "created_at"),
+class PlayerSessionModel(Base):  # type: ignore
+    __tablename__ = "player_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    player_id: Mapped[int] = mapped_column(
+        ForeignKey("players.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
+    player: Mapped["PlayerModel"] = relationship(back_populates="sessions")
 
     server_id: Mapped[int] = mapped_column(
         ForeignKey("servers.id", ondelete="CASCADE"),
-        primary_key=True,
+        nullable=False,
+        index=True,
     )
     server: Mapped["ServerModel"] = relationship(
-        back_populates="players",
+        back_populates="player_sessions",
     )
-    player_id: Mapped[int] = mapped_column(
-        ForeignKey("players.id", ondelete="CASCADE"),
-        primary_key=True,
+
+    from_: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
     )
-    player: Mapped["PlayerModel"] = relationship(
-        back_populates="servers",
-    )
+    to: Mapped[datetime | None] = mapped_column(nullable=True)
 
 
 class PlayerSnapshotModel(Base, TimestampMixin):  # type: ignore
@@ -85,20 +85,3 @@ class PlayerSnapshotModel(Base, TimestampMixin):  # type: ignore
     )  # not unique because of offline players
     skin: Mapped[str | None] = mapped_column(String(32), nullable=True)  # hash
     cape: Mapped[str | None] = mapped_column(String(32), nullable=True)  # hash
-
-
-class PlayerSessionModel(Base):  # type: ignore
-    __tablename__ = "player_sessions"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-    player_id: Mapped[int] = mapped_column(
-        ForeignKey("players.id", ondelete="CASCADE"),
-        index=True,
-    )
-    player: Mapped["PlayerModel"] = relationship(back_populates="sessions")
-
-    from_: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    to: Mapped[datetime | None] = mapped_column(nullable=True)
