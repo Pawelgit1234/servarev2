@@ -8,12 +8,13 @@ COPY pyproject.toml uv.lock ./
 COPY packages ./packages
 COPY conftest.py ./conftest.py
 
-ENV PYTHONPATH="/app/packages/common/src:/app/packages/checker/src:/app/packages/scanner/src:/app/packages/porter/src"
+ENV PYTHONPATH="/app/packages/common/src:/app/packages/checker/src:/app/packages/scanner/src:/app/packages/porter/src:/app/packages/monitor/src"
 ENV PATH="/app/.venv/bin:$PATH"
 
 RUN uv sync --frozen --group test --no-dev
 RUN uv pip install -e packages/common
 RUN uv pip install -e packages/checker
 RUN uv pip install -e packages/scanner
+RUN uv pip install -e packages/monitor
 
 CMD ["pytest", "-s"]

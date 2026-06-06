@@ -75,7 +75,7 @@ async def server_worker() -> None:
             )
             await db.commit()
 
-            log = "Servers were checked:"
+            log = "Servers were checked: "
             for s in server_models:
                 log += f" {s.ip}:{s.port},"
             logger.info(log)

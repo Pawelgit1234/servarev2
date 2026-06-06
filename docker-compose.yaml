@@ -121,7 +121,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - DB_HOST=db_test
-      - DB_PORT=5433
+      - DB_PORT=5432
     profiles:
       - manual
     depends_on:
