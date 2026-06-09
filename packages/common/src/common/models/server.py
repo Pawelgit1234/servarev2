@@ -24,6 +24,8 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    UniqueConstraint,
+    desc,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -42,6 +44,7 @@ if TYPE_CHECKING:
 class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
     __tablename__ = "servers"
     __table_args__ = (
+        UniqueConstraint("ip", "port", name="uq_servers_ip_port"),
         Index("ix_servers_ip", "ip"),
         Index("ix_servers_port", "port"),
         Index("ix_servers_server_type", "server_type"),
@@ -86,24 +89,29 @@ class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
     sessions: Mapped[list["ServerSessionModel"]] = relationship(
         back_populates="server",
         cascade="all, delete-orphan",
+        order_by="desc(ServerSessionModel.from_)",
     )
     snapshots: Mapped[list["ServerSnapshotModel"]] = relationship(
         back_populates="server",
         cascade="all, delete-orphan",
+        order_by="desc(ServerSnapshotModel.created_at)",
     )
     dynamic_snapshots: Mapped[list["ServerDynamicSnapshotModel"]] = (
         relationship(
             back_populates="server",
             cascade="all, delete-orphan",
+            order_by="desc(ServerDynamicSnapshotModel.created_at)",
         )
     )
     bot_snapshots: Mapped[list["ServerBotSnapshotModel"]] = relationship(
         back_populates="server",
         cascade="all, delete-orphan",
+        order_by="desc(ServerBotSnapshotModel.created_at)",
     )
     player_sessions: Mapped[list["PlayerSessionModel"]] = relationship(
         back_populates="server",
         cascade="all, delete-orphan",
+        order_by="desc(PlayerSessionModel.from_)",
     )
     ports: Mapped[list["ServerPortAssociationModel"]] = relationship(
         back_populates="server",
@@ -113,6 +121,13 @@ class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
 
 class ServerSessionModel(Base):  # type: ignore
     __tablename__ = "server_sessions"
+    __table_args__ = (
+        Index(
+            "ix_server_sessions_server_id_from_desc",
+            "server_id",
+            desc("from_"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -189,7 +204,7 @@ class ServerSnapshotModel(Base, TimestampMixin):  # type: ignore
         Index(
             "ix_server_snapshots_server_id_created_at",
             "server_id",
-            "created_at",
+            desc("created_at"),
         ),
     )
 
@@ -264,7 +279,7 @@ class ServerDynamicSnapshotModel(Base, TimestampMixin):  # type: ignore
         Index(
             "ix_server_dynamic_snapshots_server_id_created_at",
             "server_id",
-            "created_at",
+            desc("created_at"),
         ),
     )
 
@@ -287,7 +302,7 @@ class ServerBotSnapshotModel(Base, TimestampMixin):  # type: ignore
         Index(
             "ix_server_bot_snapshots_server_id_created_at",
             "server_id",
-            "created_at",
+            desc("created_at"),
         ),
     )
 
@@ -321,7 +336,7 @@ class ServerBotSnapshotModel(Base, TimestampMixin):  # type: ignore
     )
 
 
-class SubchunkModel(Base, TimestampMixin):  # type: ignore
+class SubchunkModel(Base):  # type: ignore
     __tablename__ = "subchunks"
 
     id: Mapped[int] = mapped_column(primary_key=True)

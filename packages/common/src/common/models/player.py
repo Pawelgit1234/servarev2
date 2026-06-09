@@ -5,7 +5,7 @@ from common.base import Base
 from common.enums import PlayerType
 from common.models.mixins import LastSeenMixin, TimestampMixin
 from common.settings import USERNAME_MAX
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, desc, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -31,15 +31,29 @@ class PlayerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
     snapshots: Mapped[list["PlayerSnapshotModel"]] = relationship(
         back_populates="player",
         cascade="all, delete-orphan",
+        order_by="desc(PlayerSnapshotModel.created_at)",
     )
     sessions: Mapped[list["PlayerSessionModel"]] = relationship(
         back_populates="player",
         cascade="all, delete-orphan",
+        order_by="desc(PlayerSessionModel.from_)",
     )
 
 
 class PlayerSessionModel(Base):  # type: ignore
     __tablename__ = "player_sessions"
+    __table_args__ = (
+        Index(
+            "ix_player_sessions_server_id_from_desc",
+            "server_id",
+            desc("from_"),
+        ),
+        Index(
+            "ix_player_sessions_player_id_from_desc",
+            "player_id",
+            desc("from_"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -69,7 +83,11 @@ class PlayerSnapshotModel(Base, TimestampMixin):  # type: ignore
     __tablename__ = "player_snapshots"
     __table_args__ = (
         Index("ix_player_snapshots_name", "name"),
-        Index("ix_player_snapshots_created_at", "created_at"),
+        Index(
+            "ix_player_snapshots_player_id_created_at",
+            "player_id",
+            desc("created_at"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
