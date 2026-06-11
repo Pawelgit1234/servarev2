@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # == Tests for "get_next_server_group" ==
 @pytest.mark.asyncio
-async def test_get_next_server_group_servers_with_same_ip(
+async def test_get_next_server_group_servers_last_seen_change(
     db: AsyncSession,
 ) -> None:
     s1 = ServerModel(
@@ -74,7 +74,7 @@ async def test_get_next_server_group_servers_with_same_ip(
 
 
 @pytest.mark.asyncio
-async def test_get_next_server_group_loads_only_latest_snapshots(
+async def test_get_next_server_group_only_latest_snapshots_one_server(
     db: AsyncSession,
 ) -> None:
     server = ServerModel(
@@ -118,7 +118,84 @@ async def test_get_next_server_group_loads_only_latest_snapshots(
 
 
 @pytest.mark.asyncio
-async def test_get_next_server_group_loads_only_latest_dynamic_snapshots(
+async def test_get_next_server_group_only_latest_snapshots_two_servers(
+    db: AsyncSession,
+) -> None:
+    s1 = ServerModel(
+        ip="1.1.1.1",
+        port=25565,
+        is_lan=False,
+        is_multiport=False,
+        server_type=ServerType.JAVA,
+    )
+    s1_old = ServerSnapshotModel(
+        server=s1,
+        version="1.19",
+        players_max=20,
+        motd="s1_old",
+        latency=1,
+        created_at=datetime(2000, 1, 1, 1, 1, 1),
+    )
+    s1_new = ServerSnapshotModel(
+        server=s1,
+        version="1.20",
+        players_max=100,
+        motd="s1_new",
+        latency=1,
+        created_at=datetime(2000, 1, 1, 1, 1, 2),
+    )
+
+    s2 = ServerModel(
+        ip="1.1.1.1",
+        port=25566,
+        is_lan=False,
+        is_multiport=False,
+        server_type=ServerType.JAVA,
+    )
+    s2_old = ServerSnapshotModel(
+        server=s2,
+        version="1.19",
+        players_max=20,
+        motd="s2_old",
+        latency=1,
+        created_at=datetime(2000, 1, 1, 1, 1, 1),
+    )
+    s2_new = ServerSnapshotModel(
+        server=s2,
+        version="1.20",
+        players_max=100,
+        motd="s2_new",
+        latency=1,
+        created_at=datetime(2000, 1, 1, 1, 1, 2),
+    )
+
+    db.add_all([s1, s1_old, s1_new, s2, s2_old, s2_new])
+    await db.commit()
+
+    db.expire_all()  # very important!
+
+    servers = await get_next_server_group(db)
+
+    assert len(servers) == 2
+
+    servers_by_port = {s.port: s for s in servers}
+
+    assert 25565 in servers_by_port
+    assert 25566 in servers_by_port
+
+    loaded_s1 = servers_by_port[25565]
+    assert len(loaded_s1.snapshots) == 1
+    assert loaded_s1.snapshots[0].version == "1.20"
+    assert loaded_s1.snapshots[0].motd == "s1_new"
+
+    loaded_s2 = servers_by_port[25566]
+    assert len(loaded_s2.snapshots) == 1
+    assert loaded_s2.snapshots[0].version == "1.20"
+    assert loaded_s2.snapshots[0].motd == "s2_new"
+
+
+@pytest.mark.asyncio
+async def test_get_next_server_group_only_latest_dynamic_snapshots_one_server(
     db: AsyncSession,
 ) -> None:
     server = ServerModel(
@@ -147,6 +224,7 @@ async def test_get_next_server_group_loads_only_latest_dynamic_snapshots(
     db.expire_all()  # very important!
 
     servers = await get_next_server_group(db)
+
     assert len(servers) == 1
 
     loaded_server = servers[0]
@@ -154,7 +232,71 @@ async def test_get_next_server_group_loads_only_latest_dynamic_snapshots(
     assert loaded_server.dynamic_snapshots[0].players_online == 2
 
 
-async def test_get_next_server_group_loads_only_latest_server_session(
+@pytest.mark.asyncio
+async def test_get_next_server_group_only_latest_dynamic_snapshots_two_servers(
+    db: AsyncSession,
+) -> None:
+    s1 = ServerModel(
+        ip="1.1.1.1",
+        port=25565,
+        is_lan=False,
+        is_multiport=False,
+        server_type=ServerType.JAVA,
+    )
+    s1_old = ServerDynamicSnapshotModel(
+        server=s1,
+        players_online=1,
+        created_at=datetime(2000, 1, 1, 1, 1, 1),
+    )
+    s1_new = ServerDynamicSnapshotModel(
+        server=s1,
+        players_online=2,
+        created_at=datetime(2000, 1, 1, 1, 1, 2),
+    )
+
+    s2 = ServerModel(
+        ip="1.1.1.1",
+        port=25566,
+        is_lan=False,
+        is_multiport=False,
+        server_type=ServerType.JAVA,
+    )
+    s2_old = ServerDynamicSnapshotModel(
+        server=s2,
+        players_online=10,
+        created_at=datetime(2000, 1, 1, 1, 1, 1),
+    )
+    s2_new = ServerDynamicSnapshotModel(
+        server=s2,
+        players_online=20,
+        created_at=datetime(2000, 1, 1, 1, 1, 2),
+    )
+
+    db.add_all([s1, s1_old, s1_new, s2, s2_old, s2_new])
+    await db.commit()
+
+    db.expire_all()  # very important!
+
+    servers = await get_next_server_group(db)
+
+    assert len(servers) == 2
+
+    servers_by_port = {s.port: s for s in servers}
+
+    assert 25565 in servers_by_port
+    assert 25566 in servers_by_port
+
+    loaded_s1 = servers_by_port[25565]
+    assert len(loaded_s1.dynamic_snapshots) == 1
+    assert loaded_s1.dynamic_snapshots[0].players_online == 2
+
+    loaded_s2 = servers_by_port[25566]
+    assert len(loaded_s2.dynamic_snapshots) == 1
+    assert loaded_s2.dynamic_snapshots[0].players_online == 20
+
+
+@pytest.mark.asyncio
+async def test_get_next_server_group_only_latest_server_session_one_server(
     db: AsyncSession,
 ) -> None:
     server = ServerModel(
@@ -183,6 +325,7 @@ async def test_get_next_server_group_loads_only_latest_server_session(
     db.expire_all()  # very important!
 
     servers = await get_next_server_group(db)
+
     assert len(servers) == 1
 
     loaded_server = servers[0]
@@ -193,7 +336,76 @@ async def test_get_next_server_group_loads_only_latest_server_session(
     assert loaded_server.sessions[0].to is None
 
 
-async def test_get_next_server_group_loads_players(
+@pytest.mark.asyncio
+async def test_get_next_server_group_only_latest_server_session_two_servers(
+    db: AsyncSession,
+) -> None:
+    s1 = ServerModel(
+        ip="1.1.1.1",
+        port=25565,
+        is_lan=False,
+        is_multiport=False,
+        server_type=ServerType.JAVA,
+    )
+    s1_old = ServerSessionModel(
+        server=s1,
+        from_=datetime(2000, 1, 1, 1, 1, 1),
+        to=datetime(2000, 1, 1, 1, 1, 2),
+    )
+    s1_new = ServerSessionModel(
+        server=s1,
+        from_=datetime(2000, 1, 1, 1, 1, 3),
+        to=None,
+    )
+
+    s2 = ServerModel(
+        ip="1.1.1.1",
+        port=25566,
+        is_lan=False,
+        is_multiport=False,
+        server_type=ServerType.JAVA,
+    )
+    s2_old = ServerSessionModel(
+        server=s2,
+        from_=datetime(2000, 1, 1, 1, 1, 1),
+        to=datetime(2000, 1, 1, 1, 1, 2),
+    )
+    s2_new = ServerSessionModel(
+        server=s2,
+        from_=datetime(2000, 1, 1, 1, 1, 4),
+        to=None,
+    )
+
+    db.add_all([s1, s1_old, s1_new, s2, s2_old, s2_new])
+    await db.commit()
+
+    db.expire_all()  # very important!
+
+    servers = await get_next_server_group(db)
+
+    assert len(servers) == 2
+
+    servers_by_port = {s.port: s for s in servers}
+
+    assert 25565 in servers_by_port
+    assert 25566 in servers_by_port
+
+    loaded_s1 = servers_by_port[25565]
+    assert len(loaded_s1.sessions) == 1
+    assert loaded_s1.sessions[0].from_ == datetime(
+        2000, 1, 1, 1, 1, 3, tzinfo=UTC
+    )
+    assert loaded_s1.sessions[0].to is None
+
+    loaded_s2 = servers_by_port[25566]
+    assert len(loaded_s2.sessions) == 1
+    assert loaded_s2.sessions[0].from_ == datetime(
+        2000, 1, 1, 1, 1, 4, tzinfo=UTC
+    )
+    assert loaded_s2.sessions[0].to is None
+
+
+async def test_get_next_server_group_players_one_server(
     db: AsyncSession,
 ) -> None:
     server = ServerModel(
@@ -305,6 +517,195 @@ async def test_get_next_server_group_loads_players(
 
     assert len(s2.player.snapshots) == 1
     assert s2.player.snapshots[0].name == "p2_new"
+
+
+@pytest.mark.asyncio
+async def test_get_next_server_group_players_two_servers(
+    db: AsyncSession,
+) -> None:
+    s1 = ServerModel(
+        ip="1.1.1.1",
+        port=25565,
+        is_lan=False,
+        is_multiport=False,
+        server_type=ServerType.JAVA,
+    )
+    s1_p1 = PlayerModel(
+        player_type=PlayerType.PREMIUM,
+        uuid="11111111-1111-1111-1111-111111111111",
+    )
+    s1_p1_session_old = PlayerSessionModel(
+        server=s1,
+        player=s1_p1,
+        from_=datetime(2000, 1, 1, 1, 1, 1),
+        to=datetime(2000, 1, 1, 1, 1, 2),
+    )
+    s1_p1_session_new = PlayerSessionModel(
+        server=s1,
+        player=s1_p1,
+        from_=datetime(2000, 1, 1, 1, 1, 3),
+        to=None,
+    )
+    s1_p1_snapshot_old = PlayerSnapshotModel(
+        player=s1_p1,
+        name="p1_old",
+        skin=None,
+        cape=None,
+        created_at=datetime(2000, 1, 1, 1, 1, 1),
+    )
+    s1_p1_snapshot_new = PlayerSnapshotModel(
+        player=s1_p1,
+        name="p1_new",
+        skin=None,
+        cape=None,
+        created_at=datetime(2000, 1, 1, 1, 1, 2),
+    )
+
+    s1_p2 = PlayerModel(
+        player_type=PlayerType.PREMIUM,
+        uuid="22222222-2222-2222-2222-222222222222",
+    )
+    s1_p2_session_old = PlayerSessionModel(
+        server=s1,
+        player=s1_p2,
+        from_=datetime(2000, 1, 1, 1, 1, 1),
+        to=datetime(2000, 1, 1, 1, 1, 2),
+    )
+    s1_p2_session_new = PlayerSessionModel(
+        server=s1,
+        player=s1_p2,
+        from_=datetime(2000, 1, 1, 1, 1, 3),
+        to=None,
+    )
+    s1_p2_snapshot_old = PlayerSnapshotModel(
+        player=s1_p2,
+        name="p2_old",
+        skin=None,
+        cape=None,
+        created_at=datetime(2000, 1, 1, 1, 1, 1),
+    )
+    s1_p2_snapshot_new = PlayerSnapshotModel(
+        player=s1_p2,
+        name="p2_new",
+        skin=None,
+        cape=None,
+        created_at=datetime(2000, 1, 1, 1, 1, 2),
+    )
+
+    s2 = ServerModel(
+        ip="1.1.1.1",
+        port=25566,
+        is_lan=False,
+        is_multiport=False,
+        server_type=ServerType.JAVA,
+    )
+    s2_p1 = PlayerModel(
+        player_type=PlayerType.PREMIUM,
+        uuid="33333333-3333-3333-3333-333333333333",
+    )
+    s2_p1_session_old = PlayerSessionModel(
+        server=s2,
+        player=s2_p1,
+        from_=datetime(2000, 1, 1, 1, 1, 1),
+        to=datetime(2000, 1, 1, 1, 1, 2),
+    )
+    s2_p1_session_new = PlayerSessionModel(
+        server=s2,
+        player=s2_p1,
+        from_=datetime(2000, 1, 1, 1, 1, 3),
+        to=None,
+    )
+    s2_p1_snapshot_old = PlayerSnapshotModel(
+        player=s2_p1,
+        name="p3_old",
+        skin=None,
+        cape=None,
+        created_at=datetime(2000, 1, 1, 1, 1, 1),
+    )
+    s2_p1_snapshot_new = PlayerSnapshotModel(
+        player=s2_p1,
+        name="p3_new",
+        skin=None,
+        cape=None,
+        created_at=datetime(2000, 1, 1, 1, 1, 2),
+    )
+
+    db.add_all(
+        [
+            s1,
+            s1_p1,
+            s1_p1_session_old,
+            s1_p1_session_new,
+            s1_p1_snapshot_old,
+            s1_p1_snapshot_new,
+            s1_p2,
+            s1_p2_session_old,
+            s1_p2_session_new,
+            s1_p2_snapshot_old,
+            s1_p2_snapshot_new,
+            s2,
+            s2_p1,
+            s2_p1_session_old,
+            s2_p1_session_new,
+            s2_p1_snapshot_old,
+            s2_p1_snapshot_new,
+        ]
+    )
+
+    await db.commit()
+    db.expire_all()
+
+    servers = await get_next_server_group(db)
+
+    assert len(servers) == 2
+
+    servers_by_port = {s.port: s for s in servers}
+
+    assert 25565 in servers_by_port
+    assert 25566 in servers_by_port
+
+    s1_loaded = servers_by_port[25565]
+    assert len(s1_loaded.player_sessions) == 2
+
+    s1_sessions = {s.player.uuid: s for s in s1_loaded.player_sessions}
+
+    assert (
+        len(
+            s1_sessions[
+                "11111111-1111-1111-1111-111111111111"
+            ].player.snapshots
+        )
+        == 1
+    )
+    assert (
+        s1_sessions["11111111-1111-1111-1111-111111111111"]
+        .player.snapshots[0]
+        .name
+        == "p1_new"
+    )
+
+    assert (
+        len(
+            s1_sessions[
+                "22222222-2222-2222-2222-222222222222"
+            ].player.snapshots
+        )
+        == 1
+    )
+    assert (
+        s1_sessions["22222222-2222-2222-2222-222222222222"]
+        .player.snapshots[0]
+        .name
+        == "p2_new"
+    )
+
+    s2_loaded = servers_by_port[25566]
+    assert len(s2_loaded.player_sessions) == 1
+
+    s2_session = s2_loaded.player_sessions[0]
+    assert s2_session.player.uuid == "33333333-3333-3333-3333-333333333333"
+    assert len(s2_session.player.snapshots) == 1
+    assert s2_session.player.snapshots[0].name == "p3_new"
 
 
 # == Tests for "save_servers" ==

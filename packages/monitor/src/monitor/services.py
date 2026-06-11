@@ -50,23 +50,24 @@ async def get_next_server_group(
 
     latest_snapshot = (
         select(ServerSnapshotModel)
-        .where(ServerSnapshotModel.server_id == ServerModel.id)
-        .order_by(ServerSnapshotModel.created_at.desc())
-        .limit(1)
-        .correlate(ServerModel)
+        .distinct(ServerSnapshotModel.server_id)
+        .order_by(
+            ServerSnapshotModel.server_id,
+            ServerSnapshotModel.created_at.desc(),
+        )
         .subquery()
     )
     latest_snapshot_alias = aliased(ServerSnapshotModel, latest_snapshot)
 
     latest_dynamic_snapshot = (
         select(ServerDynamicSnapshotModel)
-        .where(ServerDynamicSnapshotModel.server_id == ServerModel.id)
-        .order_by(ServerDynamicSnapshotModel.created_at.desc())
-        .limit(1)
-        .correlate(ServerModel)
+        .distinct(ServerDynamicSnapshotModel.server_id)
+        .order_by(
+            ServerDynamicSnapshotModel.server_id,
+            ServerDynamicSnapshotModel.created_at.desc(),
+        )
         .subquery()
     )
-
     latest_dynamic_snapshot_alias = aliased(
         ServerDynamicSnapshotModel,
         latest_dynamic_snapshot,
@@ -74,10 +75,11 @@ async def get_next_server_group(
 
     latest_session = (
         select(ServerSessionModel)
-        .where(ServerSessionModel.server_id == ServerModel.id)
-        .order_by(ServerSessionModel.from_.desc())
-        .limit(1)
-        .correlate(ServerModel)
+        .distinct(ServerSessionModel.server_id)
+        .order_by(
+            ServerSessionModel.server_id,
+            ServerSessionModel.from_.desc(),
+        )
         .subquery()
     )
     latest_session_alias = aliased(ServerSessionModel, latest_session)
@@ -249,8 +251,7 @@ def player_snapshot_changed(
 async def save_servers(
     db: AsyncSession,
     servers: list[tuple[ServerModel, ServerCheckSchema | None]],
-    ip_info: IpInfoSchema,
-    update_ip: bool,
+    ip_info: IpInfoSchema | None,
     update_porter: bool,
 ) -> None:
 
@@ -312,19 +313,21 @@ async def save_servers(
     mod_map = {(m.name, m.version): m for m in existing_mods}
 
     for server, check in servers:
-        if update_ip:
+        if ip_info is not None:
             server.last_ip_check_at = func.now()
+            # TODO: значение не обрезаются,
+            # нужно определять это чеку, перед его normalize
+            if ip_info.country is not None:
+                server.country = ip_info.country
+                server.region = ip_info.region
+                server.city = ip_info.city
+                server.latitude = ip_info.latitude
+                server.longitude = ip_info.longitude
+                server.hostname = ip_info.hostname
+                server.asn = ip_info.asn
+
         if update_porter:
             server.last_porter_check_at = func.now()
-
-        if ip_info.country is not None:
-            server.country = ip_info.country
-            server.region = ip_info.region
-            server.city = ip_info.city
-            server.latitude = ip_info.latitude
-            server.longitude = ip_info.longitude
-            server.hostname = ip_info.hostname
-            server.asn = ip_info.asn
 
         # == Session ==
         last_session = server.sessions[0] if server.sessions else None

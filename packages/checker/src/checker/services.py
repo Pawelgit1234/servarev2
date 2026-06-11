@@ -194,6 +194,8 @@ async def save_ports(
 
         if server is None:
             # TODO: save server properly
+            # normilize, upload, etc => whole pipeline
+            # => use monitor func get_next_server_group & save_servers ???
             server = ServerModel(
                 ip=server_data.server.ip,
                 port=server_data.server.port,
