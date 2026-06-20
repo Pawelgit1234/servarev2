@@ -8,7 +8,7 @@ from common.settings import (
     MOD_VERSION_MAX,
     PLUGIN_NAME_MAX,
     RESOURCE_PACK_URL_MAX,
-    SOFTWARE_VESION_MAX,
+    SOFTWARE_VERSION_MAX,
 )
 from sqlalchemy import Enum, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -32,7 +32,7 @@ class SoftwareModel(Base, TimestampMixin):  # type: ignore
         Enum(ServerSoftwareType), nullable=False
     )
     version: Mapped[str] = mapped_column(
-        String(SOFTWARE_VESION_MAX), nullable=False
+        String(SOFTWARE_VERSION_MAX), nullable=False
     )
 
     snapshots: Mapped[list["ServerSnapshotModel"]] = relationship(

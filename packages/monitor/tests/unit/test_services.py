@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from common.enums import PlayerType, ServerType
@@ -13,7 +14,8 @@ from common.models.server import (
     ServerSessionModel,
     ServerSnapshotModel,
 )
-from monitor.services import get_next_server_group
+from common.schemas.ip import IpInfoSchema
+from monitor.services import get_next_server_group, prepare_ip_data
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -708,4 +710,34 @@ async def test_get_next_server_group_players_two_servers(
     assert s2_session.player.snapshots[0].name == "p3_new"
 
 
-# == Tests for "save_servers" ==
+# == Tests for "prepare_ip_data" ==
+@pytest.mark.asyncio
+async def test_prepare_ip_data_both_expired_calls_ip_and_redis() -> None:
+    server = ServerModel(
+        ip="1.1.1.1",
+        port=25566,
+        is_lan=False,
+        is_multiport=False,
+        server_type=ServerType.JAVA,
+        last_ip_check_at=datetime(2000, 1, 1, 1, 1, 1),
+        last_porter_check_at=datetime(2000, 1, 1, 1, 1, 1),
+    )
+
+    fake_ip = IpInfoSchema(
+        country="DE",
+        region="Berlin",
+        city="Berlin",
+        latitude=51.0,
+        longitude=7.0,
+        hostname="host",
+        asn="ASN 123",
+    )
+
+    with patch(
+        "monitor.services.get_ip_info", new=AsyncMock(return_value=fake_ip)
+    ) as ip_mock:
+        ip_info, update_porter = await prepare_ip_data(server)
+
+    assert ip_info == fake_ip
+    assert update_porter is True
+    ip_mock.assert_awaited_once_with("1.1.1.1")

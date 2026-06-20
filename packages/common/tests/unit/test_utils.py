@@ -22,7 +22,7 @@ from common.settings import (
     SERVER_MAP_NAME_MAX,
     SERVER_MOTD_MAX,
     SERVER_VERSION_MAX,
-    SOFTWARE_VESION_MAX,
+    SOFTWARE_VERSION_MAX,
     USERNAME_MAX,
 )
 from common.utils import (
@@ -125,7 +125,7 @@ def test_normilize_server_check() -> None:
         == SERVER_GAMEMODE_MAX
     )
 
-    assert len(server.software.version) == SOFTWARE_VESION_MAX
+    assert len(server.software.version) == SOFTWARE_VERSION_MAX
 
     assert len(server.mods[0].name) == MOD_NAME_MAX
 

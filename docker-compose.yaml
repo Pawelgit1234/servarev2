@@ -12,7 +12,8 @@ services:
       - DB_HOST=localhost
       - DB_PORT=5432
       - MASSCAN_RATE=${MASSCAN_RATE}
-      - IS_NETWORK_MODE_HOST=1
+      - REDIS_HOST=localhost
+      - REDIS_PORT=6379
     network_mode: host
     cap_add:
       - NET_RAW
@@ -35,7 +36,8 @@ services:
       - DB_PORT=5432
       - MASSCAN_RATE=${MASSCAN_RATE}
       - MASSCAN_RATE_TARGET=${MASSCAN_RATE_TARGET}
-      - IS_NETWORK_MODE_HOST=1
+      - REDIS_HOST=localhost
+      - REDIS_PORT=6379
       - PORTER_BATCH_SIZE=${PORTER_BATCH_SIZE}
     network_mode: host
     cap_add:
@@ -57,6 +59,8 @@ services:
       - DB_NAME=${DB_NAME}
       - DB_HOST=db
       - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - CHECKER_CONCURRENCY=${CHECKER_CONCURRENCY}
       - CHECKER_PORT_CONCURRENCY=${CHECKER_PORT_CONCURRENCY}
       - SERVER_CHECK_TIMEOUT=${SERVER_CHECK_TIMEOUT}
@@ -82,6 +86,8 @@ services:
       - DB_NAME=${DB_NAME}
       - DB_HOST=db
       - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - SERVER_CHECK_TIMEOUT=${SERVER_CHECK_TIMEOUT}
       - MONITOR_SERVER_CONCURRENCY=${MONITOR_SERVER_CONCURRENCY}
       - MONITOR_PORT_CONCURRENCY=${MONITOR_PORT_CONCURRENCY}
@@ -120,12 +126,17 @@ services:
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
+      - REDIS_HOST=redis-test
+      - REDIS_PORT=6379
       - DB_HOST=db_test
       - DB_PORT=5432
+      - IP_CHECK_INTERVAL_DAYS=${IP_CHECK_INTERVAL_DAYS}
+      - PORTER_CHECK_INTERVAL_DAYS=${PORTER_CHECK_INTERVAL_DAYS}
     profiles:
       - manual
     depends_on:
       - db_test
+      - redis_test
   
   db_test:
     image: postgres:18.3-alpine
@@ -139,6 +150,13 @@ services:
       - manual
     ports:
       - 5433:5432
+
+  redis_test:
+    image: redis:8.6.2-alpine
+    container_name: redis-test
+    restart: no
+    ports:
+      - 6380:6379
   
   db:
     image: postgres:18.3-alpine

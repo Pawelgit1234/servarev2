@@ -196,6 +196,10 @@ async def save_ports(
             # TODO: save server properly
             # normilize, upload, etc => whole pipeline
             # => use monitor func get_next_server_group & save_servers ???
+            # => no no no, save_servers is only for 100% sure existing
+            # servers but here some of the can be not already existing
+            # => so a part goes trough save_servers and the other trough
+            # save_non_existing_server? (=> rewrite for muliple servers)
             server = ServerModel(
                 ip=server_data.server.ip,
                 port=server_data.server.port,

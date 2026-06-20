@@ -1,6 +1,7 @@
 import base64
 from datetime import UTC, datetime, timedelta
 
+from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
 from common.schemas.ip import IpInfoSchema
 from common.schemas.server import ServerCheckSchema
 from common.settings import (
@@ -16,7 +17,7 @@ from common.settings import (
     SERVER_MAP_NAME_MAX,
     SERVER_MOTD_MAX,
     SERVER_VERSION_MAX,
-    SOFTWARE_VESION_MAX,
+    SOFTWARE_VERSION_MAX,
     USERNAME_MAX,
 )
 
@@ -44,6 +45,9 @@ def decode_base64(string: str) -> bytes | None:
 
 
 def has_expired(timestamp: datetime, delta: int) -> bool:
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=UTC)
+
     return datetime.now(UTC) > (  # type: ignore
         timestamp + timedelta(days=delta)
     )
@@ -104,19 +108,27 @@ def normilize_server_check(server: ServerCheckSchema) -> None:
     )  # type: ignore
 
     # Software
-    server.software.version = _truncate(
-        server.software.version,
-        SOFTWARE_VESION_MAX,
-    )  # type: ignore
+    server.software = SoftwareSchema(
+        name=server.software.name,
+        version=_truncate(server.software.version, SOFTWARE_VERSION_MAX),  # type: ignore
+    )
 
     # Mods
-    for mod in server.mods:
-        mod.name = _truncate(mod.name, MOD_NAME_MAX)  # type: ignore
-        mod.version = _truncate(mod.version, MOD_VERSION_MAX)  # type: ignore
+    server.mods = [
+        ModSchema(
+            name=_truncate(m.name, MOD_NAME_MAX),  # type: ignore
+            version=_truncate(m.version, MOD_VERSION_MAX),  # type: ignore
+        )
+        for m in server.mods
+    ]
 
     # Plugins
-    for plugin in server.plugins:
-        plugin.name = _truncate(plugin.name, PLUGIN_NAME_MAX)  # type: ignore
+    server.plugins = [
+        PluginSchema(
+            name=_truncate(p.name, PLUGIN_NAME_MAX)  # type: ignore
+        )
+        for p in server.plugins
+    ]
 
     # Players
     for player_snapshot in server.players.values():

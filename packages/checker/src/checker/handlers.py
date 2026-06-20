@@ -1,7 +1,6 @@
 import logging
 
 from common.databases import async_session, ra
-from common.logger import setup_logging
 from common.services.server import upload_servers
 from common.settings import REDIS_PORTER_QUEUE
 from common.utils import normilize_server_check
@@ -14,8 +13,12 @@ from checker.services import (
     save_ports,
 )
 
-setup_logging()
 logger = logging.getLogger(__name__)
+
+# TODO!!!!!
+# для меня и будущего:
+# сравни устройство handlers.py и workers.py, а также checker/services.py и
+# monitor/services.py => делай скрины и в paint'е разбирай по полкам
 
 
 async def handle_masscan(address: str) -> None:
@@ -30,7 +33,6 @@ async def handle_masscan(address: str) -> None:
             return
 
         normilize_server_check(server)
-
         await upload_servers([server])
 
         await save_non_existing_server(db, server)
