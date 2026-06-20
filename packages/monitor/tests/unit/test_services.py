@@ -15,6 +15,7 @@ from common.models.server import (
     ServerSnapshotModel,
 )
 from common.schemas.ip import IpInfoSchema
+from common.settings import REDIS_PORTER_QUEUE
 from monitor.services import get_next_server_group, prepare_ip_data
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -733,11 +734,121 @@ async def test_prepare_ip_data_both_expired_calls_ip_and_redis() -> None:
         asn="ASN 123",
     )
 
-    with patch(
-        "monitor.services.get_ip_info", new=AsyncMock(return_value=fake_ip)
-    ) as ip_mock:
-        ip_info, update_porter = await prepare_ip_data(server)
+    with patch("monitor.services.ra.rpush", new=AsyncMock()) as rpush_mock:  # noqa: SIM117
+        with patch(
+            "monitor.services.get_ip_info", new=AsyncMock(return_value=fake_ip)
+        ) as ip_mock:
+            ip_info, update_porter = await prepare_ip_data(server)
+
+    rpush_mock.assert_awaited_once_with(REDIS_PORTER_QUEUE, server.ip)
 
     assert ip_info == fake_ip
     assert update_porter is True
     ip_mock.assert_awaited_once_with("1.1.1.1")
+
+
+@pytest.mark.asyncio
+async def test_prepare_ip_data_only_ip_expired_calls_ip_only() -> None:
+    server = ServerModel(
+        ip="1.1.1.1",
+        port=25566,
+        is_lan=False,
+        is_multiport=False,
+        server_type=ServerType.JAVA,
+        last_ip_check_at=datetime(2000, 1, 1, 1, 1, 1),
+        last_porter_check_at=datetime(3000, 1, 1, 1, 1, 1),  # not expired
+    )
+
+    fake_ip = IpInfoSchema(
+        country="DE",
+        region="Berlin",
+        city="Berlin",
+        latitude=51.0,
+        longitude=7.0,
+        hostname="host",
+        asn="ASN 123",
+    )
+
+    with patch(  # noqa: SIM117
+        "monitor.services.get_ip_info", new=AsyncMock(return_value=fake_ip)
+    ) as ip_mock:
+        with patch("monitor.services.ra.rpush", new=AsyncMock()) as rpush_mock:
+            ip_info, update_porter = await prepare_ip_data(server)
+
+    assert ip_info == fake_ip
+    assert update_porter is False
+
+    ip_mock.assert_awaited_once_with("1.1.1.1")
+    rpush_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_prepare_ip_data_only_porter_expired_calls_redis_only() -> None:
+    server = ServerModel(
+        ip="1.1.1.1",
+        port=25566,
+        is_lan=False,
+        is_multiport=False,
+        server_type=ServerType.JAVA,
+        last_ip_check_at=datetime(3000, 1, 1, 1, 1, 1),  # not expired
+        last_porter_check_at=datetime(2000, 1, 1, 1, 1, 1),
+    )
+
+    with patch("monitor.services.get_ip_info", new=AsyncMock()) as ip_mock:  # noqa: SIM117
+        with patch("monitor.services.ra.rpush", new=AsyncMock()) as rpush_mock:
+            ip_info, update_porter = await prepare_ip_data(server)
+
+    assert ip_info is None
+    assert update_porter is True
+
+    ip_mock.assert_not_awaited()
+    rpush_mock.assert_awaited_once_with(
+        REDIS_PORTER_QUEUE,
+        server.ip,
+    )
+
+
+@pytest.mark.asyncio
+async def test_prepare_ip_data_none_expired_calls_nothing() -> None:
+    server = ServerModel(
+        ip="1.1.1.1",
+        port=25566,
+        is_lan=False,
+        is_multiport=False,
+        server_type=ServerType.JAVA,
+        last_ip_check_at=datetime(3000, 1, 1, 1, 1, 1),
+        last_porter_check_at=datetime(3000, 1, 1, 1, 1, 1),
+    )
+
+    with patch("monitor.services.get_ip_info", new=AsyncMock()) as ip_mock:  # noqa: SIM117
+        with patch("monitor.services.ra.rpush", new=AsyncMock()) as rpush_mock:
+            ip_info, update_porter = await prepare_ip_data(server)
+
+    assert ip_info is None
+    assert update_porter is False
+
+    ip_mock.assert_not_awaited()
+    rpush_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_prepare_ip_data_multiport_skips_porter() -> None:
+    server = ServerModel(
+        ip="1.1.1.1",
+        port=25566,
+        is_lan=False,
+        is_multiport=True,
+        server_type=ServerType.JAVA,
+        last_ip_check_at=datetime(3000, 1, 1, 1, 1, 1),
+        last_porter_check_at=datetime(2000, 1, 1, 1, 1, 1),
+    )
+
+    with patch("monitor.services.get_ip_info", new=AsyncMock()) as ip_mock:  # noqa: SIM117
+        with patch("monitor.services.ra.rpush", new=AsyncMock()) as rpush_mock:
+            ip_info, update_porter = await prepare_ip_data(server)
+
+    assert ip_info is None
+    assert update_porter is False
+
+    ip_mock.assert_not_awaited()
+    rpush_mock.assert_not_awaited()

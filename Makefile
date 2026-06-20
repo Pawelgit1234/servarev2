@@ -22,4 +22,3 @@ downgrade:
 test:
 	docker compose run --rm --build tester || true
 	docker compose stop db_test
-	docker compose stop redis_test

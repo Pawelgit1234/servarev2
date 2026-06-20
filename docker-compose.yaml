@@ -136,7 +136,6 @@ services:
       - manual
     depends_on:
       - db_test
-      - redis_test
   
   db_test:
     image: postgres:18.3-alpine
@@ -151,13 +150,6 @@ services:
     ports:
       - 5433:5432
 
-  redis_test:
-    image: redis:8.6.2-alpine
-    container_name: redis-test
-    restart: no
-    ports:
-      - 6380:6379
-  
   db:
     image: postgres:18.3-alpine
     container_name: postgres-db
