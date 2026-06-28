@@ -219,8 +219,6 @@ def handle_ip_info_and_porter(
     ip_info: IpInfoSchema | None,
     update_porter: bool,
 ) -> None:
-    # TODO: значение не обрезаются,
-    # нужно определять это чеку, перед его normalize
     if ip_info is not None and ip_info.country is not None:
         server.last_ip_check_at = func.now()
 
@@ -286,12 +284,6 @@ def handle_server_snapshot(
 
         # == Software ==
 
-        # last software is already in software_map (plugins and mods too)
-        # TODO: test save_servers
-        # TODO: is this comment above wrong? If yes, rewrite. But do this
-        # only after writing tests. If no, remove from
-        # get_next_server_group the load of last mod, plugin and software
-        # + let the first comment exists but add some explatnation
         software = software_map.get(check.software)
         if software is None:
             software = SoftwareModel(

@@ -60,6 +60,33 @@ def _truncate(value: str | None, limit: int) -> str | None:
     return value.strip()[:limit]
 
 
+def normilize_ip_info(ip_info: IpInfoSchema) -> None:
+    ip_info.country = _truncate(
+        ip_info.country,
+        COUNTRY_MAX,
+    )  # type: ignore
+
+    ip_info.region = _truncate(
+        ip_info.region,
+        REGION_MAX,
+    )  # type: ignore
+
+    ip_info.city = _truncate(
+        ip_info.city,
+        CITY_MAX,
+    )  # type: ignore
+
+    ip_info.hostname = _truncate(
+        ip_info.hostname,
+        HOSTNAME_MAX,
+    )  # type: ignore
+
+    ip_info.asn = _truncate(
+        ip_info.asn,
+        ASN_MAX,
+    )  # type: ignore
+
+
 def normilize_server_check(server: ServerCheckSchema) -> None:
     server.server.country = _truncate(
         server.server.country,

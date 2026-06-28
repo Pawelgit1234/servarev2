@@ -2,6 +2,7 @@ import logging
 
 from common.databases import async_session
 from common.services.server import upload_servers
+from common.utils import normilize_ip_info
 
 from monitor.checks import check_servers
 from monitor.services import (
@@ -29,10 +30,12 @@ async def server_worker() -> None:
             if server_model is None:  # happens only if the database is empty
                 continue
 
+            ip_info, update_porter = await prepare_ip_data(server_model)
+            if ip_info is not None:
+                normilize_ip_info(ip_info)
+
             active_server_checks = normilize_server_checks(servers)
             await upload_servers(active_server_checks)
-
-            ip_info, update_porter = await prepare_ip_data(server_model)
 
             await save_servers(db, servers, ip_info, update_porter)
             await db.commit()
