@@ -29,6 +29,8 @@ class ServerSchema(IpInfoSchema, TimestampMixin, LastSeenMixin):  # type: ignore
 
 
 class ServerPortSchema(BaseModel):  # type: ignore
+    model_config = ConfigDict(frozen=True)
+
     port: int
     protocol_type: ProtocolType
     detected_service_type: DetectedServiceType

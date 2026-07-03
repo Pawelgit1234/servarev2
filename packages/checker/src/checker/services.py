@@ -1,9 +1,8 @@
+from itertools import product
+
 from common.models.assets import (
-    ModModel,
-    PluginModel,
     ServerSnapshotModAssociationModel,
     ServerSnapshotPluginAssociationModel,
-    SoftwareModel,
 )
 from common.models.player import (
     PlayerModel,
@@ -19,8 +18,19 @@ from common.models.server import (
     ServerSnapshotModel,
 )
 from common.schemas.server import ServerCheckSchema, ServerPortSchema
-from sqlalchemy import select, tuple_
+from common.services.assets import (
+    ensure_mod,
+    ensure_plugin,
+    ensure_software,
+    load_existing_mods,
+    load_existing_plugins,
+    load_existing_softwares,
+)
+from common.services.server import ensure_port, load_existing_ports
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from checker.utils import extract_assets_from_checks
 
 
 async def is_server_in_db(db: AsyncSession, ip: str, port: int) -> bool:
@@ -36,136 +46,151 @@ async def is_server_in_db(db: AsyncSession, ip: str, port: int) -> bool:
     return exists is not None
 
 
-async def save_non_existing_server(
-    db: AsyncSession, data: ServerCheckSchema
-) -> None:
-    # Server
-    server = ServerModel(
-        ip=data.server.ip,
-        port=data.server.port,
-        server_type=data.server.server_type,
-        is_lan=data.server.is_lan,
-        is_multiport=data.server.is_multiport,
-        country=data.server.country,
-        region=data.server.region,
-        city=data.server.city,
-        latitude=data.server.latitude,
-        longitude=data.server.longitude,
-        hostname=data.server.hostname,
-        asn=data.server.asn,
+async def get_servers_with_same_ip(
+    db: AsyncSession, ip: str
+) -> list[ServerModel]:
+    return (
+        (await db.execute(select(ServerModel).where(ServerModel.ip == ip)))
+        .scalars()
+        .all()  # type: ignore
     )
-    db.add(server)
 
-    server_snapshot = ServerSnapshotModel(
-        server=server,
-        version=data.server_snapshot.version,
-        players_max=data.server_snapshot.players_max,
-        motd=data.server_snapshot.motd,
-        latency=data.server_snapshot.latency,
-        protocol=data.server_snapshot.protocol,
-        icon=data.server_snapshot.icon,
-        enforcesSecureChat=data.server_snapshot.enforcesSecureChat,
-        fml_network_version=data.server_snapshot.fml_network_version,
-        mods_truncated=data.server_snapshot.mods_truncated,
-        map_name=data.server_snapshot.map_name,
-        gamemode=data.server_snapshot.gamemode,
-    )
-    db.add(server_snapshot)
 
-    dynamic_snapshot = ServerDynamicSnapshotModel(
-        server=server,
-        players_online=data.server_dynamic_snapshot.players_online,
-    )
-    db.add(dynamic_snapshot)
+async def load_existing_server_port_associations(
+    db: AsyncSession,
+    servers: list[ServerModel],
+    ports: list[ServerPortModel],
+) -> set[tuple[int, int]]:
+    server_ids = [s.id for s in servers]
+    port_ids = [p.id for p in ports]
 
-    servers_session = ServerSessionModel(server=server)
-    db.add(servers_session)
+    if not server_ids or not port_ids:
+        return set()
 
-    # Player
-    for player_schema, snapshot_schema in data.players.items():
-        player = PlayerModel(
-            player_type=player_schema.player_type,
-            uuid=player_schema.uuid,
-        )
-        db.add(player)
-
-        player_snapshot = PlayerSnapshotModel(
-            player=player,
-            name=snapshot_schema.name,
-            skin=snapshot_schema.skin,
-            cape=snapshot_schema.cape,
-        )
-        db.add(player_snapshot)
-
-        player_session = PlayerSessionModel(server=server, player=player)
-        db.add(player_session)
-
-    # Assets
-    software = (
+    rows = (
         await db.execute(
-            select(SoftwareModel).where(
-                SoftwareModel.name == data.software.name,
-                SoftwareModel.version == data.software.version,
+            select(
+                ServerPortAssociationModel.server_id,
+                ServerPortAssociationModel.server_port_id,
+            ).where(
+                ServerPortAssociationModel.server_id.in_(server_ids),
+                ServerPortAssociationModel.server_port_id.in_(port_ids),
             )
         )
-    ).scalar_one_or_none()
+    ).all()
 
-    if software is None:
-        software = SoftwareModel(
-            name=data.software.name,
-            version=data.software.version,
-        )
-        db.add(software)
-    server_snapshot.software = software
+    return set(rows)  # type: ignore
 
-    mods_keys = {(m.name, m.version) for m in data.mods}
-    mods_rows = (
-        (
-            await db.execute(
-                select(ModModel).where(
-                    tuple_(ModModel.name, ModModel.version).in_(mods_keys)
-                )
+
+def ensure_server_port_associations(
+    db: AsyncSession,
+    all_servers: list[ServerModel],
+    all_ports: list[ServerPortModel],
+    existing_assocs: set[tuple[int, int]],
+) -> None:
+    for server, port in product(all_servers, all_ports):
+        key = (server.id, port.id)
+
+        if key in existing_assocs:
+            continue
+
+        db.add(
+            ServerPortAssociationModel(
+                server=server,
+                server_port=port,
             )
         )
-        .scalars()
-        .all()
-    )
-    mods_map = {(m.name, m.version): m for m in mods_rows}
 
-    for m in data.mods:
-        key = (m.name, m.version)
 
-        mod = mods_map.get(key)
-        if mod is None:
-            mod = ModModel(name=m.name, version=m.version)
-            db.add(mod)
+async def save_non_existing_servers(
+    db: AsyncSession, checks: list[ServerCheckSchema]
+) -> list[ServerModel]:
+    all_softwares, all_plugins, all_mods = extract_assets_from_checks(checks)
+    software_map = await load_existing_softwares(db, all_softwares)
+    plugin_map = await load_existing_plugins(db, all_plugins)
+    mod_map = await load_existing_mods(db, all_mods)
 
-        server_snapshot.mod_associations.append(
-            ServerSnapshotModAssociationModel(mod=mod)
+    server_models = []
+    for check in checks:
+        # Server
+        server = ServerModel(
+            ip=check.server.ip,
+            port=check.server.port,
+            server_type=check.server.server_type,
+            is_lan=check.server.is_lan,
+            is_multiport=check.server.is_multiport,
+            country=check.server.country,
+            region=check.server.region,
+            city=check.server.city,
+            latitude=check.server.latitude,
+            longitude=check.server.longitude,
+            hostname=check.server.hostname,
+            asn=check.server.asn,
         )
+        server_models.append(server)
+        db.add(server)
 
-    plugin_names = {p.name for p in data.plugins}
-    plugins_rows = (
-        (
-            await db.execute(
-                select(PluginModel).where(PluginModel.name.in_(plugin_names))
+        server_snapshot = ServerSnapshotModel(
+            server=server,
+            version=check.server_snapshot.version,
+            players_max=check.server_snapshot.players_max,
+            motd=check.server_snapshot.motd,
+            latency=check.server_snapshot.latency,
+            protocol=check.server_snapshot.protocol,
+            icon=check.server_snapshot.icon,
+            enforcesSecureChat=check.server_snapshot.enforcesSecureChat,
+            fml_network_version=check.server_snapshot.fml_network_version,
+            mods_truncated=check.server_snapshot.mods_truncated,
+            map_name=check.server_snapshot.map_name,
+            gamemode=check.server_snapshot.gamemode,
+        )
+        db.add(server_snapshot)
+
+        dynamic_snapshot = ServerDynamicSnapshotModel(
+            server=server,
+            players_online=check.server_dynamic_snapshot.players_online,
+        )
+        db.add(dynamic_snapshot)
+
+        servers_session = ServerSessionModel(server=server)
+        db.add(servers_session)
+
+        # Player
+        for player_schema, snapshot_schema in check.players.items():
+            player = PlayerModel(
+                player_type=player_schema.player_type,
+                uuid=player_schema.uuid,
             )
-        )
-        .scalars()
-        .all()
-    )
-    plugins_map = {p.name: p for p in plugins_rows}
+            db.add(player)
 
-    for p in data.plugins:
-        plugin = plugins_map.get(p.name)
+            player_snapshot = PlayerSnapshotModel(
+                player=player,
+                name=snapshot_schema.name,
+                skin=snapshot_schema.skin,
+                cape=snapshot_schema.cape,
+            )
+            db.add(player_snapshot)
 
-        if plugin is None:
-            plugin = PluginModel(name=p.name)
-            db.add(plugin)
+            player_session = PlayerSessionModel(server=server, player=player)
+            db.add(player_session)
 
-        server_snapshot.plugin_associations.append(
-            ServerSnapshotPluginAssociationModel(plugin=plugin)
-        )
+        # Assets
+        software = ensure_software(db, software_map, check.software)
+        server_snapshot.software = software
+
+        for p in check.plugins:
+            plugin = ensure_plugin(db, plugin_map, p)
+            server_snapshot.plugin_associations.append(
+                ServerSnapshotPluginAssociationModel(plugin=plugin)
+            )
+
+        for m in check.mods:
+            mod = ensure_mod(db, mod_map, m)
+            server_snapshot.mod_associations.append(
+                ServerSnapshotModAssociationModel(mod=mod)
+            )
+
+    return server_models
 
 
 async def save_ports(
@@ -174,123 +199,36 @@ async def save_ports(
     servers: list[ServerCheckSchema],
     ip: str,
 ) -> None:
-    if not servers and not ports:
-        return
-
     # servers
-    existing_servers = (
-        (await db.execute(select(ServerModel).where(ServerModel.ip == ip)))
-        .scalars()
-        .all()
-    )
-
+    existing_servers = await get_servers_with_same_ip(db, ip)
     existing_servers_map = {(s.ip, s.port): s for s in existing_servers}
 
     all_servers: list[ServerModel] = []
+    new_servers: list[ServerCheckSchema] = []
 
     for server_data in servers:
         server_key = (server_data.server.ip, server_data.server.port)
         server = existing_servers_map.get(server_key)
 
         if server is None:
-            # TODO: save server properly
-            # normilize, upload, etc => whole pipeline
-            # => use monitor func get_next_server_group & save_servers ???
-            # => no no no, save_servers is only for 100% sure existing
-            # servers but here some of the can be not already existing
-            # => so a part goes trough save_servers and the other trough
-            # save_non_existing_server? (=> rewrite for muliple servers)
-            server = ServerModel(
-                ip=server_data.server.ip,
-                port=server_data.server.port,
-                server_type=server_data.server.server_type,
-                is_lan=server_data.server.is_lan,
-                is_multiport=server_data.server.is_multiport,
-                country=server_data.server.country,
-                region=server_data.server.region,
-                city=server_data.server.city,
-                latitude=server_data.server.latitude,
-                longitude=server_data.server.longitude,
-                hostname=server_data.server.hostname,
-                asn=server_data.server.asn,
-            )
-            db.add(server)
+            new_servers.append(server_data)
+        else:
+            all_servers.append(server)
 
-        all_servers.append(server)
+    all_servers.extend(await save_non_existing_servers(db, new_servers))
 
     # Ports
-    port_keys = {
-        (p.port, p.protocol_type, p.detected_service_type) for p in ports
-    }
-
-    existing_ports = (
-        (
-            await db.execute(
-                select(ServerPortModel).where(
-                    tuple_(
-                        ServerPortModel.port,
-                        ServerPortModel.protocol_type,
-                        ServerPortModel.detected_service_type,
-                    ).in_(port_keys)
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-
-    port_map = {
-        (p.port, p.protocol_type, p.detected_service_type): p
-        for p in existing_ports
-    }
-
+    port_map = await load_existing_ports(db, ports)
     all_ports: list[ServerPortModel] = []
-
-    for p in ports:
-        port_key = (p.port, p.protocol_type, p.detected_service_type)
-        port = port_map.get(port_key)
-
-        if port is None:
-            port = ServerPortModel(
-                port=p.port,
-                protocol_type=p.protocol_type,
-                detected_service_type=p.detected_service_type,
-            )
-            db.add(port)
-
-        all_ports.append(port)
+    for port_schema in ports:
+        all_ports.append(ensure_port(db, port_map, port_schema))
 
     await db.flush()
 
     # Associations
-    existing_assocs = set(
-        (
-            await db.execute(
-                select(
-                    ServerPortAssociationModel.server_id,
-                    ServerPortAssociationModel.server_port_id,
-                ).where(
-                    ServerPortAssociationModel.server_id.in_(
-                        [s.id for s in all_servers]
-                    ),
-                    ServerPortAssociationModel.server_port_id.in_(
-                        [p.id for p in all_ports]
-                    ),
-                )
-            )
-        ).all()
+    existing_assocs = await load_existing_server_port_associations(
+        db, all_servers, all_ports
     )
-
-    for server in all_servers:
-        for port in all_ports:
-            key = (server.id, port.id)
-
-            if key in existing_assocs:
-                continue
-
-            db.add(
-                ServerPortAssociationModel(
-                    server=server,
-                    server_port=port,
-                )
-            )
+    ensure_server_port_associations(
+        db, all_servers, all_ports, existing_assocs
+    )

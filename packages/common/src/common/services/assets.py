@@ -1,7 +1,47 @@
 from common.models.assets import ModModel, PluginModel, SoftwareModel
 from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
+from common.services.common import ensure_entity
 from sqlalchemy import select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
+
+
+def ensure_software(
+    db: AsyncSession,
+    software_map: dict[SoftwareSchema, SoftwareModel],
+    software_schema: SoftwareSchema,
+) -> SoftwareModel:
+    return ensure_entity(
+        db,
+        software_map,
+        software_schema,
+        lambda s: SoftwareModel(name=s.name, version=s.version),
+    )
+
+
+def ensure_plugin(
+    db: AsyncSession,
+    plugin_map: dict[PluginSchema, PluginModel],
+    plugin_schema: PluginSchema,
+) -> PluginModel:
+    return ensure_entity(
+        db,
+        plugin_map,
+        plugin_schema,
+        lambda p: PluginModel(name=p.name),
+    )
+
+
+def ensure_mod(
+    db: AsyncSession,
+    mod_map: dict[ModSchema, ModModel],
+    mod_schema: ModSchema,
+) -> ModModel:
+    return ensure_entity(
+        db,
+        mod_map,
+        mod_schema,
+        lambda m: ModModel(name=m.name, version=m.version),
+    )
 
 
 async def load_existing_softwares(

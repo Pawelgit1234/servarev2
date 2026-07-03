@@ -25,6 +25,9 @@ from common.schemas.server import (
     ServerCheckSchema,
 )
 from common.services.assets import (
+    ensure_mod,
+    ensure_plugin,
+    ensure_software,
     load_existing_mods,
     load_existing_plugins,
     load_existing_softwares,
@@ -41,7 +44,7 @@ from sqlalchemy.orm import aliased, contains_eager
 
 from monitor.utils import (
     dynamic_snapshot_changed,
-    extract_assets_from_checks,
+    extract_assets_from_servers,
     need_create_server_snapshot,
     player_snapshot_changed,
 )
@@ -283,37 +286,19 @@ def handle_server_snapshot(
         db.add(new_snapshot)
 
         # == Software ==
-
-        software = software_map.get(check.software)
-        if software is None:
-            software = SoftwareModel(
-                name=check.software.name,
-                version=check.software.version,
-            )
-            software_map[check.software] = software
-            db.add(software)
+        software = ensure_software(db, software_map, check.software)
         new_snapshot.software = software  # type: ignore
 
         # == Plugins ==
         for p in check.plugins:
-            plugin = plugin_map.get(p)
-
-            if plugin is None:
-                plugin = PluginModel(name=p.name)
-                plugin_map[p] = plugin
-                db.add(plugin)
+            plugin = ensure_plugin(db, plugin_map, p)
             new_snapshot.plugin_associations.append(
                 ServerSnapshotPluginAssociationModel(plugin=plugin)
             )
 
         # == Mods ==
         for m in check.mods:
-            mod = mod_map.get(m)
-
-            if mod is None:
-                mod = ModModel(name=m.name, version=m.version)
-                mod_map[m] = mod
-                db.add(mod)
+            mod = ensure_mod(db, mod_map, m)
             new_snapshot.mod_associations.append(
                 ServerSnapshotModAssociationModel(mod=mod)
             )
@@ -421,9 +406,8 @@ async def save_servers(
     ip_info: IpInfoSchema | None,
     update_porter: bool,
 ) -> None:
-
     # collects all incoming softwares/plugins/mods from batch
-    all_softwares, all_plugins, all_mods = extract_assets_from_checks(servers)
+    all_softwares, all_plugins, all_mods = extract_assets_from_servers(servers)
     software_map = await load_existing_softwares(db, all_softwares)
     plugin_map = await load_existing_plugins(db, all_plugins)
     mod_map = await load_existing_mods(db, all_mods)

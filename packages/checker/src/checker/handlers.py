@@ -9,16 +9,11 @@ from checker.checks import check_server, check_server_ports
 from checker.parsers import parse_masscan_address, parse_porter_address
 from checker.services import (
     is_server_in_db,
-    save_non_existing_server,
+    save_non_existing_servers,
     save_ports,
 )
 
 logger = logging.getLogger(__name__)
-
-# TODO!!!!!
-# для меня и будущего:
-# сравни устройство handlers.py и workers.py, а также checker/services.py и
-# monitor/services.py => делай скрины и в paint'е разбирай по полкам
 
 
 async def handle_masscan(address: str) -> None:
@@ -35,7 +30,7 @@ async def handle_masscan(address: str) -> None:
         normilize_server_check(server)
         await upload_servers([server])
 
-        await save_non_existing_server(db, server)
+        await save_non_existing_servers(db, [server])
         await db.commit()
 
     logger.info(f"New server: {server.server.ip}:{server.server.port}")
@@ -47,6 +42,9 @@ async def handle_masscan(address: str) -> None:
 async def handle_porter(address: str) -> None:
     ports, ip = parse_porter_address(address)
     defined_ports, servers = await check_server_ports(ports, ip)
+
+    if not defined_ports and not servers:
+        return
 
     for server in servers:
         normilize_server_check(server)

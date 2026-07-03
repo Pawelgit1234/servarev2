@@ -118,24 +118,6 @@ def player_snapshot_changed(
     )
 
 
-def extract_assets_from_checks(
-    servers: list[tuple[ServerModel, ServerCheckSchema | None]],
-) -> tuple[list[SoftwareSchema], list[PluginSchema], list[ModSchema]]:
-    all_softwares = []
-    all_plugins = []
-    all_mods = []
-
-    for _, check in servers:
-        if not check:
-            continue
-
-        all_softwares.append(check.software)
-        all_plugins.extend(check.plugins)
-        all_mods.extend(check.mods)
-
-    return all_softwares, all_plugins, all_mods
-
-
 def need_create_server_snapshot(
     server: ServerModel,
     check: ServerCheckSchema,
@@ -164,3 +146,21 @@ def need_create_server_snapshot(
             mods_changed(last_mods, check.mods),
         )
     )
+
+
+def extract_assets_from_servers(
+    servers: list[tuple[ServerModel, ServerCheckSchema | None]],
+) -> tuple[list[SoftwareSchema], list[PluginSchema], list[ModSchema]]:
+    all_softwares = []
+    all_plugins = []
+    all_mods = []
+
+    for _, check in servers:
+        if not check:
+            continue
+
+        all_softwares.append(check.software)
+        all_plugins.extend(check.plugins)
+        all_mods.extend(check.mods)
+
+    return all_softwares, all_plugins, all_mods

@@ -2,10 +2,18 @@ import asyncio
 
 from common.checks.player import download_by_url
 from common.enums import AssetField
+from common.models.server import ServerPortModel
 from common.s3client import s3
-from common.schemas.server import PendingServerAssetSchema, ServerCheckSchema
+from common.schemas.server import (
+    PendingServerAssetSchema,
+    ServerCheckSchema,
+    ServerPortSchema,
+)
+from common.services.common import ensure_entity
 from common.settings import S3_CAPE_PREFIX, S3_ICON_PREFIX, S3_SKIN_PREFIX
 from common.utils import decode_base64
+from sqlalchemy import select, tuple_
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def collect_assets(
@@ -91,3 +99,66 @@ async def upload_servers(
 
     await prepare_assets(assets)
     await upload_assets(assets)
+
+
+async def load_existing_ports(
+    db: AsyncSession,
+    ports: list[ServerPortSchema],
+) -> dict[ServerPortSchema, ServerPortModel]:
+    port_keys = {
+        (p.port, p.protocol_type, p.detected_service_type) for p in ports
+    }
+
+    rows = (
+        (
+            await db.execute(
+                select(ServerPortModel).where(
+                    tuple_(
+                        ServerPortModel.port,
+                        ServerPortModel.protocol_type,
+                        ServerPortModel.detected_service_type,
+                    ).in_(port_keys)
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    rows_map = {
+        (p.port, p.protocol_type, p.detected_service_type): p for p in rows
+    }
+
+    return {
+        port_schema: rows_map[
+            (
+                port_schema.port,
+                port_schema.protocol_type,
+                port_schema.detected_service_type,
+            )
+        ]
+        for port_schema in ports
+        if (
+            port_schema.port,
+            port_schema.protocol_type,
+            port_schema.detected_service_type,
+        )
+        in rows_map
+    }
+
+
+def ensure_port(
+    db: AsyncSession,
+    port_map: dict[ServerPortSchema, ServerPortModel],
+    port_schema: ServerPortSchema,
+) -> ServerPortModel:
+    return ensure_entity(
+        db,
+        port_map,
+        port_schema,
+        lambda p: ServerPortModel(
+            port=p.port,
+            protocol_type=p.protocol_type,
+            detected_service_type=p.detected_service_type,
+        ),
+    )

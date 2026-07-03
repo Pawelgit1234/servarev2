@@ -39,7 +39,7 @@ from monitor.services import (
     handle_server_session,
     handle_server_snapshot,
 )
-from monitor.utils import extract_assets_from_checks
+from monitor.utils import extract_assets_from_servers
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -1231,7 +1231,7 @@ async def test_handle_server_snapshot_software_change(
     )
 
     server = (await get_next_server_group(db))[0]
-    all_softwares, all_plugins, all_mods = extract_assets_from_checks(
+    all_softwares, all_plugins, all_mods = extract_assets_from_servers(
         [(server, check)]
     )
     software_map = await load_existing_softwares(db, all_softwares)
@@ -1251,8 +1251,6 @@ async def test_handle_server_snapshot_software_change(
     server_id = server.id
 
     db.expire_all()
-
-    # TODO: должен вообще создатся новый снапшот и новый software
 
     snapshots = (
         (
@@ -1326,7 +1324,7 @@ async def test_handle_server_snapshot_plugins_change(
 
     server = (await get_next_server_group(db))[0]
 
-    all_softwares, all_plugins, all_mods = extract_assets_from_checks(
+    all_softwares, all_plugins, all_mods = extract_assets_from_servers(
         [(server, check)]
     )
 
@@ -1410,7 +1408,7 @@ async def test_handle_server_snapshot_mods_change(
 
     server = (await get_next_server_group(db))[0]
 
-    all_softwares, all_plugins, all_mods = extract_assets_from_checks(
+    all_softwares, all_plugins, all_mods = extract_assets_from_servers(
         [(server, check)]
     )
 
