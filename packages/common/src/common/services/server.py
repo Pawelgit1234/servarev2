@@ -41,39 +41,38 @@ async def get_ip(db: AsyncSession, ip: str) -> IpModel | None:
     )
 
 
-async def get_or_create_ip(db: AsyncSession, ip: IpSchema) -> IpModel:
-    ip_model = await get_ip(db, ip.ip)
-    if ip_model is None:
-        ip_model = IpModel(
-            ip=ip.ip,
-            country=ip.country,
-            region=ip.region,
-            city=ip.city,
-            latitude=ip.latitude,
-            longitude=ip.longitude,
-            hostname=ip.hostname,
-            asn=ip.asn,
-        )
-        db.add(ip_model)
+def create_ip(db: AsyncSession, ip: IpSchema) -> IpModel:
+    ip_model = IpModel(
+        ip=ip.ip,
+        is_multiport=ip.is_multiport,
+        country=ip.country,
+        region=ip.region,
+        city=ip.city,
+        latitude=ip.latitude,
+        longitude=ip.longitude,
+        hostname=ip.hostname,
+        asn=ip.asn,
+    )
+    db.add(ip_model)
     return ip_model
 
 
-def handle_ip_info_and_porter(
-    server: ServerModel, ip_info: IpInfoSchema | None, update_porter: bool
+def update_ip_state(
+    ip: IpModel, ip_info: IpInfoSchema | None, update_porter: bool
 ) -> None:
     if ip_info is not None and ip_info.country is not None:
-        server.last_ip_check_at = func.now()
+        ip.last_ip_check_at = func.now()
 
-        server.country = ip_info.country
-        server.region = ip_info.region
-        server.city = ip_info.city
-        server.latitude = ip_info.latitude
-        server.longitude = ip_info.longitude
-        server.hostname = ip_info.hostname
-        server.asn = ip_info.asn
+        ip.country = ip_info.country
+        ip.region = ip_info.region
+        ip.city = ip_info.city
+        ip.latitude = ip_info.latitude
+        ip.longitude = ip_info.longitude
+        ip.hostname = ip_info.hostname
+        ip.asn = ip_info.asn
 
     if update_porter:
-        server.last_porter_check_at = func.now()
+        ip.last_porter_check_at = func.now()
 
 
 def handle_server_session(
@@ -251,13 +250,9 @@ def handle_players(
 def save_servers(
     db: AsyncSession,
     servers: list[tuple[ServerModel, ServerCheckSchema | None]],
-    ip_info: IpInfoSchema | None,
-    update_porter: bool,
     em: ExistingEntityMapsSchema,
 ) -> None:
     for server, check in servers:
-        handle_ip_info_and_porter(server, ip_info, update_porter)
-
         if handle_server_session(db, server, check) is None:
             continue  # server is offline
 

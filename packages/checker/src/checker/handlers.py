@@ -1,12 +1,17 @@
 import logging
 
+from common.checks.ip import get_ip_info
 from common.databases import async_session, ra
 from common.services.common import load_existing_entities, upload_servers
-from common.services.server import get_ip, get_or_create_ip
+from common.services.server import create_ip, get_ip
 from common.settings import REDIS_PORTER_QUEUE
-from common.utils import normilize_ip, normilize_server_check
+from common.utils import (
+    ip_info_to_ip_schema,
+    normilize_ip,
+    normilize_server_check,
+)
 
-from checker.checks import check_server, check_server_ports
+from checker.checks import check_server_by_protocol, check_server_ports
 from checker.parsers import parse_masscan_address, parse_porter_address
 from checker.services import (
     is_server_in_db,
@@ -25,34 +30,44 @@ async def handle_masscan(address: str) -> None:
         if await is_server_in_db(db, masscan.ip, masscan.port):
             return
 
-        check = await check_server(masscan)
+        # Server check
+        check = await check_server_by_protocol(
+            masscan.protocol, masscan.ip, masscan.port
+        )
         if check is None:
             return
 
-        server, ip_schema = check
-        normilize_server_check(server)
-        normilize_ip(ip_schema)
+        # Ip
+        ip = await get_ip(db, masscan.ip)
+        if ip is None:
+            ip_info = await get_ip_info(masscan.ip)
+            ip_schema = ip_info_to_ip_schema(
+                ip_info, masscan.ip, masscan.is_multiport
+            )
+            normilize_ip(ip_schema)
+            ip = create_ip(db, ip_schema)
 
-        await upload_servers([server])
+        # Server
+        normilize_server_check(check)
+        await upload_servers([check])
 
-        ip = await get_or_create_ip(db, ip_schema)
-        entities = extract_entities_from_checks([server])
+        entities = extract_entities_from_checks([check])
         entity_maps = await load_existing_entities(db, entities)
 
-        save_non_existing_servers(db, [server], ip, entity_maps)
+        save_non_existing_servers(db, [check], ip, entity_maps)
         await db.commit()
 
-    logger.info(f"New server: {ip.ip}:{server.server.port}")
+    logger.info(f"New server: {ip.ip}:{check.server.port}")
 
-    if not masscan.is_multiport:
+    if not ip.is_multiport:
         await ra.rpush(REDIS_PORTER_QUEUE, ip.ip)  # type: ignore
 
 
 async def handle_porter(address: str) -> None:
     ports, ip = parse_porter_address(address)
-    defined_ports, servers = await check_server_ports(ports, ip)
+    defined_ports, checks = await check_server_ports(ports, ip)
 
-    if not defined_ports and not servers:
+    if not defined_ports and not checks:
         return
 
     async with async_session() as db:  # type: ignore
@@ -63,12 +78,12 @@ async def handle_porter(address: str) -> None:
             logger.warning(f"{ip} was not found in db")
             return
 
-        for server in servers:
+        for server in checks:
             normilize_server_check(server)
 
-        await upload_servers(servers)
+        await upload_servers(checks)
 
-        await save_porter(db, defined_ports, servers, ip_model)
+        await save_porter(db, defined_ports, checks, ip_model)
         await db.commit()
 
     logger.info(f"Ports and servers of {ip} were saved")

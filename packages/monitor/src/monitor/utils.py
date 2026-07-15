@@ -1,6 +1,6 @@
 import logging
 
-from common.models.server import ServerModel
+from common.models.server import IpModel, ServerModel
 from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
 from common.schemas.common import ExtractedEntitiesSchema
 from common.schemas.player import PlayerSchema
@@ -24,10 +24,10 @@ def normilize_server_checks(
     return active_server_checks
 
 
-def log_servers_saved(ip: str, server_models: list[ServerModel]) -> None:
-    log = "Servers were checked: "
-    for s in server_models:
-        log += f" {ip}:{s.port},"
+def log_servers_saved(ip: IpModel) -> None:
+    log = f"Servers of {ip.ip} were checked: "
+    for s in ip.servers:
+        log += f"{s.port}, "
     logger.info(log)
 
 

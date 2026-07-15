@@ -1,19 +1,17 @@
 import asyncio
 
 from aiohttp import ClientError
-from common.checks.ip import get_ip_info
 from common.checks.server import (
     check_bedrock_server,
     check_java_server,
     check_legacy_server,
 )
 from common.enums import DetectedServiceType, ProtocolType
-from common.schemas.server import IpPortSchema, IpSchema, ServerCheckSchema
+from common.schemas.server import IpPortSchema, ServerCheckSchema
 from common.session import session_manager
 from common.settings import CHECKER_PORT_CONCURRENCY
-from common.utils import ip_info_to_ip_schema
 
-from checker.schemas import MasscanAddressSchema, PorterSchema
+from checker.schemas import PorterSchema
 
 s = asyncio.Semaphore(CHECKER_PORT_CONCURRENCY)  # type: ignore
 
@@ -104,22 +102,6 @@ async def detect_service(
         protocol_type=ProtocolType.TCP,
         detected_service_type=detected,
     )
-
-
-async def check_server(
-    masscan: MasscanAddressSchema,
-) -> tuple[ServerCheckSchema, IpSchema] | None:
-    check = await check_server_by_protocol(
-        masscan.protocol, masscan.ip, masscan.port
-    )
-    if check is None:
-        return None
-
-    check.server.is_multiport = masscan.is_multiport
-
-    ip_info = await get_ip_info(masscan.ip)
-    ip = ip_info_to_ip_schema(ip_info, masscan.ip)
-    return check, ip
 
 
 async def limited_check(

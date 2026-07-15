@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class IpSchema(IpInfoSchema, LastSeenMixin):  # type: ignore
     ip: str
+    is_multiport: bool = False
     last_ip_check_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC)
     )
@@ -21,8 +22,7 @@ class IpSchema(IpInfoSchema, LastSeenMixin):  # type: ignore
 class ServerSchema(TimestampMixin):  # type: ignore
     port: int
     server_type: ServerType
-    is_lan: bool
-    is_multiport: bool = False
+    is_lan: bool = False
 
 
 class IpPortSchema(BaseModel):  # type: ignore

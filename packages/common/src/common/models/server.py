@@ -54,6 +54,8 @@ class IpModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
         DateTime(timezone=True), server_default=func.now()
     )
 
+    is_multiport: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
     # Geo
     country: Mapped[str | None] = mapped_column(
         String(COUNTRY_MAX), nullable=True
@@ -92,8 +94,7 @@ class ServerModel(Base, TimestampMixin):  # type: ignore
     id: Mapped[int] = mapped_column(primary_key=True)
 
     port: Mapped[int] = mapped_column(Integer, nullable=False)
-    is_lan: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    is_multiport: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_lan: Mapped[bool] = mapped_column(Boolean, nullable=False)  # e.g. e4mc
     server_type: Mapped[ServerType] = mapped_column(
         Enum(ServerType), nullable=False
     )

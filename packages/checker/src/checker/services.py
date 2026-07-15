@@ -86,7 +86,6 @@ def save_non_existing_servers(
             port=check.server.port,
             server_type=check.server.server_type,
             is_lan=check.server.is_lan,
-            is_multiport=check.server.is_multiport,
         )
         server_models.append(server)
         db.add(server)
@@ -163,7 +162,7 @@ async def save_porter(
         entities = extract_entities_from_checks(new_servers)
         entity_maps = await load_existing_entities(db, entities)
         save_non_existing_servers(db, new_servers, ip, entity_maps)
-        save_servers(db, old_servers, None, False, entity_maps)  # type: ignore
+        save_servers(db, old_servers, entity_maps)  # type: ignore
 
     if ports:
         port_map = {

@@ -29,10 +29,10 @@ async def check_server_by_type(
 
 
 async def check_servers(
-    servers: list[ServerModel],
+    ip: str, servers: list[ServerModel]
 ) -> list[tuple[ServerModel, ServerCheckSchema | None]]:
     results = await asyncio.gather(
-        *(check_server_by_type(s.ip, s.port, s.server_type) for s in servers)
+        *(check_server_by_type(ip, s.port, s.server_type) for s in servers)
     )
 
     return list(zip(servers, results, strict=True))

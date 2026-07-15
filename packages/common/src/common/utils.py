@@ -46,7 +46,9 @@ from common.settings import (
 #     server.server.asn = ip_info.asn
 
 
-def ip_info_to_ip_schema(ip_info: IpInfoSchema, ip: str) -> IpSchema:
+def ip_info_to_ip_schema(
+    ip_info: IpInfoSchema, ip: str, is_multiport: bool
+) -> IpSchema:
     return IpSchema(
         country=ip_info.country,
         region=ip_info.region,
@@ -56,6 +58,7 @@ def ip_info_to_ip_schema(ip_info: IpInfoSchema, ip: str) -> IpSchema:
         hostname=ip_info.hostname,
         asn=ip_info.asn,
         ip=ip,
+        is_multiport=is_multiport,
     )
 
 

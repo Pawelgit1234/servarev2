@@ -10,6 +10,7 @@ from common.models.player import (
     PlayerSnapshotModel,
 )
 from common.models.server import (
+    IpModel,
     ServerDynamicSnapshotModel,
     ServerModel,
     ServerSessionModel,
@@ -27,22 +28,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, contains_eager
 
 
-async def get_next_server_group(
+async def get_next_ip(
     db: AsyncSession,
-) -> list[ServerModel]:
-    ip_subquery = (
-        select(ServerModel.ip)
-        .order_by(ServerModel.last_seen_at.asc())
+) -> IpModel | None:
+    locked_ip_subquery = (
+        select(IpModel.id)
+        .order_by(IpModel.last_seen_at.asc())
         .limit(1)
+        .with_for_update(skip_locked=True)
         .scalar_subquery()
     )
 
-    updated_ids = (
-        update(ServerModel)
-        .where(ServerModel.ip == ip_subquery)
+    updated_ip = (
+        update(IpModel)
+        .where(IpModel.id == locked_ip_subquery)
         .values(last_seen_at=func.now())
-        .returning(ServerModel.id)
-        .cte("updated_ids")
+        .returning(IpModel.id)
+        .cte("updated_ip")
     )
 
     latest_snapshot = (
@@ -66,16 +68,14 @@ async def get_next_server_group(
         .subquery()
     )
     latest_dynamic_snapshot_alias = aliased(
-        ServerDynamicSnapshotModel,
-        latest_dynamic_snapshot,
+        ServerDynamicSnapshotModel, latest_dynamic_snapshot
     )
 
     latest_session = (
         select(ServerSessionModel)
         .distinct(ServerSessionModel.server_id)
         .order_by(
-            ServerSessionModel.server_id,
-            ServerSessionModel.from_.desc(),
+            ServerSessionModel.server_id, ServerSessionModel.from_.desc()
         )
         .subquery()
     )
@@ -84,13 +84,8 @@ async def get_next_server_group(
     latest_player_session = (
         select(PlayerSessionModel)
         .join(PlayerModel, PlayerModel.id == PlayerSessionModel.player_id)
-        .where(PlayerSessionModel.server_id == ServerModel.id)
         .distinct(PlayerModel.uuid)
-        .order_by(
-            PlayerModel.uuid,
-            PlayerSessionModel.from_.desc(),
-        )
-        .correlate(ServerModel)
+        .order_by(PlayerModel.uuid, PlayerSessionModel.from_.desc())
         .subquery()
     )
     latest_player_session_alias = aliased(
@@ -113,8 +108,9 @@ async def get_next_server_group(
     )
 
     stmt = (
-        select(ServerModel)
-        .where(ServerModel.id.in_(select(updated_ids.c.id)))
+        select(IpModel)
+        .where(IpModel.id.in_(select(updated_ip.c.id)))
+        .outerjoin(IpModel.servers)
         .outerjoin(
             latest_snapshot_alias,
             latest_snapshot_alias.server_id == ServerModel.id,
@@ -140,55 +136,94 @@ async def get_next_server_group(
             latest_player_snapshot_alias.player_id == player_alias.id,
         )
         .options(
+            contains_eager(IpModel.servers),
             contains_eager(
-                ServerModel.snapshots, alias=latest_snapshot_alias
-            ).selectinload(ServerSnapshotModel.software),
-            contains_eager(ServerModel.snapshots, alias=latest_snapshot_alias)
-            .selectinload(ServerSnapshotModel.plugin_associations)
-            .selectinload(ServerSnapshotPluginAssociationModel.plugin),
-            contains_eager(ServerModel.snapshots, alias=latest_snapshot_alias)
-            .selectinload(ServerSnapshotModel.mod_associations)
-            .selectinload(ServerSnapshotModAssociationModel.mod),
+                IpModel.servers,
+            )
+            .contains_eager(
+                ServerModel.snapshots,
+                alias=latest_snapshot_alias,
+            )
+            .selectinload(
+                ServerSnapshotModel.software,
+            ),
             contains_eager(
+                IpModel.servers,
+            )
+            .contains_eager(
+                ServerModel.snapshots,
+                alias=latest_snapshot_alias,
+            )
+            .selectinload(
+                ServerSnapshotModel.plugin_associations,
+            )
+            .selectinload(
+                ServerSnapshotPluginAssociationModel.plugin,
+            ),
+            contains_eager(
+                IpModel.servers,
+            )
+            .contains_eager(
+                ServerModel.snapshots,
+                alias=latest_snapshot_alias,
+            )
+            .selectinload(
+                ServerSnapshotModel.mod_associations,
+            )
+            .selectinload(
+                ServerSnapshotModAssociationModel.mod,
+            ),
+            contains_eager(
+                IpModel.servers,
+            ).contains_eager(
                 ServerModel.dynamic_snapshots,
                 alias=latest_dynamic_snapshot_alias,
             ),
-            contains_eager(ServerModel.sessions, alias=latest_session_alias),
             contains_eager(
-                ServerModel.player_sessions, alias=latest_player_session_alias
+                IpModel.servers,
+            ).contains_eager(
+                ServerModel.sessions,
+                alias=latest_session_alias,
+            ),
+            contains_eager(
+                IpModel.servers,
             )
-            .contains_eager(PlayerSessionModel.player, alias=player_alias)
             .contains_eager(
-                PlayerModel.snapshots, alias=latest_player_snapshot_alias
+                ServerModel.player_sessions,
+                alias=latest_player_session_alias,
+            )
+            .contains_eager(
+                PlayerSessionModel.player,
+                alias=player_alias,
+            )
+            .contains_eager(
+                PlayerModel.snapshots,
+                alias=latest_player_snapshot_alias,
             ),
         )
     )
 
-    servers = (await db.execute(stmt)).scalars().unique().all()
-
-    return servers  # type: ignore
+    return (await db.execute(stmt)).scalars().unique().one_or_none()
 
 
-async def prepare_ip_data(
-    server_model: ServerModel,
-) -> tuple[IpInfoSchema | None, bool]:
+async def prepare_ip_data(ip: IpModel) -> tuple[IpInfoSchema | None, bool]:
     ip_info = None
     update_porter = False
 
     if has_expired(
-        server_model.last_ip_check_at,
+        ip.last_ip_check_at,
         IP_CHECK_INTERVAL_DAYS,  # type: ignore
     ):
-        ip_info = await get_ip_info(server_model.ip)
+        ip_info = await get_ip_info(ip.ip)
 
     if (
         has_expired(
-            server_model.last_porter_check_at,
+            ip.last_porter_check_at,
             PORTER_CHECK_INTERVAL_DAYS,  # type: ignore
         )
-        and not server_model.is_multiport
+        and not ip.is_multiport
     ):
-        await ra.rpush(REDIS_PORTER_QUEUE, server_model.ip)  # type: ignore
+        await ra.rpush(REDIS_PORTER_QUEUE, ip.ip)  # type: ignore
         update_porter = True
 
     return ip_info, update_porter
