@@ -24,7 +24,6 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
-    UniqueConstraint,
     desc,
     func,
 )
@@ -41,25 +40,12 @@ if TYPE_CHECKING:
     from common.models.player import PlayerSessionModel
 
 
-class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
-    __tablename__ = "servers"
-    __table_args__ = (
-        UniqueConstraint("ip", "port", name="uq_servers_ip_port"),
-        Index("ix_servers_ip", "ip"),
-        Index("ix_servers_port", "port"),
-        Index("ix_servers_server_type", "server_type"),
-        Index("ix_servers_created_at", "created_at"),
-    )
+class IpModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
+    __tablename__ = "ips"
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    ip: Mapped[str] = mapped_column(String, nullable=False)
-    port: Mapped[int] = mapped_column(Integer, nullable=False)
-    is_lan: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    is_multiport: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    server_type: Mapped[ServerType] = mapped_column(
-        Enum(ServerType), nullable=False
-    )
+    ip: Mapped[str] = mapped_column(String, nullable=False, unique=True)
 
     last_ip_check_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -85,7 +71,41 @@ class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
     )
     asn: Mapped[str | None] = mapped_column(String(ASN_MAX), nullable=True)
 
+    servers: Mapped[list["ServerModel"]] = relationship(
+        back_populates="ip",
+        cascade="all, delete-orphan",
+    )
+    ports: Mapped[list["IpPortModel"]] = relationship(
+        back_populates="ip",
+        cascade="all, delete-orphan",
+    )
+
+
+class ServerModel(Base, TimestampMixin):  # type: ignore
+    __tablename__ = "servers"
+    __table_args__ = (
+        Index("ix_servers_port", "port"),
+        Index("ix_servers_server_type", "server_type"),
+        Index("ix_servers_created_at", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    port: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_lan: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_multiport: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    server_type: Mapped[ServerType] = mapped_column(
+        Enum(ServerType), nullable=False
+    )
+
     # relationships
+    ip_id: Mapped[int] = mapped_column(
+        ForeignKey("ips.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    ip: Mapped["IpModel"] = relationship(back_populates="servers")
+
     sessions: Mapped[list["ServerSessionModel"]] = relationship(
         back_populates="server",
         cascade="all, delete-orphan",
@@ -113,9 +133,30 @@ class ServerModel(Base, TimestampMixin, LastSeenMixin):  # type: ignore
         cascade="all, delete-orphan",
         order_by="desc(PlayerSessionModel.from_)",
     )
-    ports: Mapped[list["ServerPortAssociationModel"]] = relationship(
-        back_populates="server",
-        cascade="all, delete-orphan",
+
+
+class IpPortModel(Base, TimestampMixin):  # type: ignore
+    __tablename__ = "ip_ports"
+    __table_args__ = (
+        Index("ix_ip_ports_protocol_type_port", "protocol_type", "port"),
+        Index("ix_ip_ports_detected_service_type", "detected_service_type"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    ip_id: Mapped[int] = mapped_column(
+        ForeignKey("ips.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    ip: Mapped["IpModel"] = relationship(back_populates="ports")
+
+    port: Mapped[int] = mapped_column(Integer, nullable=False)
+    protocol_type: Mapped[ProtocolType] = mapped_column(
+        Enum(ProtocolType), nullable=False
+    )
+    detected_service_type: Mapped[DetectedServiceType] = mapped_column(
+        Enum(DetectedServiceType), nullable=False
     )
 
 
@@ -143,56 +184,6 @@ class ServerSessionModel(Base):  # type: ignore
     )
     to: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
-    )
-
-
-class ServerPortModel(Base):  # type: ignore
-    __tablename__ = "server_ports"
-    __table_args__ = (
-        Index(
-            "ix_server_ports_protocol_type_port",
-            "protocol_type",
-            "port",
-        ),
-        Index(
-            "ix_server_ports_detected_service_type",
-            "detected_service_type",
-        ),
-    )
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-    servers: Mapped[list["ServerPortAssociationModel"]] = relationship(
-        back_populates="server_port",
-        cascade="all, delete-orphan",
-    )
-
-    port: Mapped[int] = mapped_column(Integer, nullable=False)
-    protocol_type: Mapped[ProtocolType] = mapped_column(
-        Enum(ProtocolType), nullable=False
-    )
-    detected_service_type: Mapped[DetectedServiceType] = mapped_column(
-        Enum(DetectedServiceType), nullable=False
-    )
-
-
-class ServerPortAssociationModel(Base, TimestampMixin):  # type: ignore
-    __tablename__ = "server_port_associations"
-
-    server_id: Mapped[int] = mapped_column(
-        ForeignKey("servers.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    server: Mapped["ServerModel"] = relationship(
-        back_populates="ports",
-    )
-
-    server_port_id: Mapped[int] = mapped_column(
-        ForeignKey("server_ports.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    server_port: Mapped["ServerPortModel"] = relationship(
-        back_populates="servers",
     )
 
 
@@ -336,7 +327,7 @@ class ServerBotSnapshotModel(Base, TimestampMixin):  # type: ignore
     )
 
 
-class SubchunkModel(Base):  # type: ignore
+class SubchunkModel(Base, TimestampMixin):  # type: ignore
     __tablename__ = "subchunks"
 
     id: Mapped[int] = mapped_column(primary_key=True)

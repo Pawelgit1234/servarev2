@@ -1,164 +1,273 @@
-import asyncio
-
-from common.checks.player import download_by_url
-from common.enums import AssetField
-from common.models.server import ServerPortModel
-from common.s3client import s3
-from common.schemas.server import (
-    PendingServerAssetSchema,
-    ServerCheckSchema,
-    ServerPortSchema,
+from common.models.assets import (
+    ModModel,
+    PluginModel,
+    ServerSnapshotModAssociationModel,
+    ServerSnapshotPluginAssociationModel,
+    SoftwareModel,
 )
-from common.services.common import ensure_entity
-from common.settings import S3_CAPE_PREFIX, S3_ICON_PREFIX, S3_SKIN_PREFIX
-from common.utils import decode_base64
-from sqlalchemy import select, tuple_
+from common.models.player import (
+    PlayerModel,
+    PlayerSessionModel,
+    PlayerSnapshotModel,
+)
+from common.models.server import (
+    IpModel,
+    ServerDynamicSnapshotModel,
+    ServerModel,
+    ServerSessionModel,
+    ServerSnapshotModel,
+)
+from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
+from common.schemas.common import ExistingEntityMapsSchema
+from common.schemas.ip import IpInfoSchema
+from common.schemas.player import PlayerSchema, PlayerSnapshotSchema
+from common.schemas.server import IpSchema, ServerCheckSchema
+from common.services.assets import ensure_mod, ensure_plugin, ensure_software
+from common.utils import (
+    dynamic_snapshot_changed,
+    need_create_server_snapshot,
+    player_snapshot_changed,
+)
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 
-def collect_assets(
-    servers: list[ServerCheckSchema],
-) -> list[PendingServerAssetSchema]:
-    assets: list[PendingServerAssetSchema] = []
-
-    for server in servers:
-        icon = server.server_snapshot.icon
-
-        if icon is not None:
-            assets.append(
-                PendingServerAssetSchema(
-                    owner=server.server_snapshot,
-                    field=AssetField.ICON,
-                    prefix=S3_ICON_PREFIX,
-                    content_type="image/png",
-                    source=icon,
-                    is_base64=True,
-                )
-            )
-
-        for snapshot in server.players.values():
-            if snapshot.skin is not None:
-                assets.append(
-                    PendingServerAssetSchema(
-                        owner=snapshot,
-                        field=AssetField.SKIN,
-                        prefix=S3_SKIN_PREFIX,
-                        source=snapshot.skin,
-                        is_base64=False,
-                    )
-                )
-
-            if snapshot.cape is not None:
-                assets.append(
-                    PendingServerAssetSchema(
-                        owner=snapshot,
-                        field=AssetField.CAPE,
-                        prefix=S3_CAPE_PREFIX,
-                        source=snapshot.cape,
-                        is_base64=False,
-                    )
-                )
-
-    return assets
-
-
-async def prepare_asset(asset: PendingServerAssetSchema) -> None:
-    if asset.is_base64:
-        asset.data = decode_base64(asset.source)
-        return
-
-    asset.data = await download_by_url(asset.source)
-
-
-async def prepare_assets(assets: list[PendingServerAssetSchema]) -> None:
-    await asyncio.gather(*(prepare_asset(asset) for asset in assets))
-
-
-async def upload_asset(asset: PendingServerAssetSchema) -> None:
-    if asset.data is None:
-        return
-
-    key = await s3.upload_bytes(
-        data=asset.data,
-        object_name=None,
-        prefix=asset.prefix,
-        content_type=asset.content_type,
+async def get_ip(db: AsyncSession, ip: str) -> IpModel | None:
+    return await db.scalar(  # type: ignore
+        select(IpModel)
+        .where(IpModel.ip == ip)
+        .options(selectinload(IpModel.servers), selectinload(IpModel.ports))
     )
 
-    setattr(asset.owner, asset.field.value, key)
+
+async def get_or_create_ip(db: AsyncSession, ip: IpSchema) -> IpModel:
+    ip_model = await get_ip(db, ip.ip)
+    if ip_model is None:
+        ip_model = IpModel(
+            ip=ip.ip,
+            country=ip.country,
+            region=ip.region,
+            city=ip.city,
+            latitude=ip.latitude,
+            longitude=ip.longitude,
+            hostname=ip.hostname,
+            asn=ip.asn,
+        )
+        db.add(ip_model)
+    return ip_model
 
 
-async def upload_assets(assets: list[PendingServerAssetSchema]) -> None:
-    await asyncio.gather(*(upload_asset(asset) for asset in assets))
-
-
-async def upload_servers(
-    servers: list[ServerCheckSchema],
+def handle_ip_info_and_porter(
+    server: ServerModel, ip_info: IpInfoSchema | None, update_porter: bool
 ) -> None:
-    assets = collect_assets(servers)
+    if ip_info is not None and ip_info.country is not None:
+        server.last_ip_check_at = func.now()
 
-    await prepare_assets(assets)
-    await upload_assets(assets)
+        server.country = ip_info.country
+        server.region = ip_info.region
+        server.city = ip_info.city
+        server.latitude = ip_info.latitude
+        server.longitude = ip_info.longitude
+        server.hostname = ip_info.hostname
+        server.asn = ip_info.asn
+
+    if update_porter:
+        server.last_porter_check_at = func.now()
 
 
-async def load_existing_ports(
+def handle_server_session(
+    db: AsyncSession, server: ServerModel, check: ServerCheckSchema | None
+) -> ServerSessionModel | None:
+    last_session = server.sessions[0] if server.sessions else None
+
+    # server inactive
+    if check is None:
+        if last_session is not None and last_session.to is None:
+            last_session.to = func.now()
+
+        return None
+
+    # server active
+    if last_session is None or last_session.to is not None:
+        new_session = ServerSessionModel(server=server)
+        db.add(new_session)
+        return new_session
+
+    return last_session
+
+
+def handle_server_snapshot(
     db: AsyncSession,
-    ports: list[ServerPortSchema],
-) -> dict[ServerPortSchema, ServerPortModel]:
-    port_keys = {
-        (p.port, p.protocol_type, p.detected_service_type) for p in ports
-    }
-
-    rows = (
-        (
-            await db.execute(
-                select(ServerPortModel).where(
-                    tuple_(
-                        ServerPortModel.port,
-                        ServerPortModel.protocol_type,
-                        ServerPortModel.detected_service_type,
-                    ).in_(port_keys)
-                )
-            )
+    server: ServerModel,
+    check: ServerCheckSchema,
+    software_map: dict[SoftwareSchema, SoftwareModel],
+    plugin_map: dict[PluginSchema, PluginModel],
+    mod_map: dict[ModSchema, ModModel],
+) -> None:
+    if need_create_server_snapshot(server, check):
+        new_snapshot = ServerSnapshotModel(
+            server=server,
+            version=check.server_snapshot.version,
+            players_max=check.server_snapshot.players_max,
+            motd=check.server_snapshot.motd,
+            latency=check.server_snapshot.latency,
+            protocol=check.server_snapshot.protocol,
+            icon=check.server_snapshot.icon,
+            enforcesSecureChat=check.server_snapshot.enforcesSecureChat,
+            fml_network_version=check.server_snapshot.fml_network_version,
+            mods_truncated=check.server_snapshot.mods_truncated,
+            map_name=check.server_snapshot.map_name,
+            gamemode=check.server_snapshot.gamemode,
         )
-        .scalars()
-        .all()
+        db.add(new_snapshot)
+
+        # == Software ==
+        software = ensure_software(db, software_map, check.software)
+        new_snapshot.software = software  # type: ignore
+
+        # == Plugins ==
+        for p in check.plugins:
+            plugin = ensure_plugin(db, plugin_map, p)
+            new_snapshot.plugin_associations.append(
+                ServerSnapshotPluginAssociationModel(plugin=plugin)
+            )
+
+        # == Mods ==
+        for m in check.mods:
+            mod = ensure_mod(db, mod_map, m)
+            new_snapshot.mod_associations.append(
+                ServerSnapshotModAssociationModel(mod=mod)
+            )
+
+
+def handle_dynamic_snapshot(
+    db: AsyncSession,
+    server: ServerModel,
+    check: ServerCheckSchema,
+) -> None:
+    last_dynamic_snapshot = (
+        server.dynamic_snapshots[0] if server.dynamic_snapshots else None
     )
 
-    rows_map = {
-        (p.port, p.protocol_type, p.detected_service_type): p for p in rows
-    }
-
-    return {
-        port_schema: rows_map[
-            (
-                port_schema.port,
-                port_schema.protocol_type,
-                port_schema.detected_service_type,
-            )
-        ]
-        for port_schema in ports
-        if (
-            port_schema.port,
-            port_schema.protocol_type,
-            port_schema.detected_service_type,
-        )
-        in rows_map
-    }
-
-
-def ensure_port(
-    db: AsyncSession,
-    port_map: dict[ServerPortSchema, ServerPortModel],
-    port_schema: ServerPortSchema,
-) -> ServerPortModel:
-    return ensure_entity(
-        db,
-        port_map,
-        port_schema,
-        lambda p: ServerPortModel(
-            port=p.port,
-            protocol_type=p.protocol_type,
-            detected_service_type=p.detected_service_type,
-        ),
+    need_new_dynamic = dynamic_snapshot_changed(
+        last_dynamic_snapshot, check.server_dynamic_snapshot
     )
+
+    if need_new_dynamic:
+        last_dynamic_snapshot = ServerDynamicSnapshotModel(
+            server=server,
+            players_online=(check.server_dynamic_snapshot.players_online),
+        )
+        db.add(last_dynamic_snapshot)
+
+
+def handle_player_join(
+    db: AsyncSession,
+    player_map: dict[PlayerSchema, PlayerModel],
+    server: ServerModel,
+    player_schema: PlayerSchema,
+    snapshot_schema: PlayerSnapshotSchema,
+) -> PlayerModel:
+    player = player_map.get(player_schema)
+
+    # Player does not exist
+    if player is None:
+        player = PlayerModel(
+            player_type=player_schema.player_type, uuid=player_schema.uuid
+        )
+
+        player_snapshot = PlayerSnapshotModel(
+            player=player,
+            name=snapshot_schema.name,
+            skin=snapshot_schema.skin,
+            cape=snapshot_schema.cape,
+        )
+
+        player_map[player_schema] = player
+        db.add_all([player, player_snapshot])
+
+    else:
+        # Create new snapshot if player data changed
+        last_player_snapshot = (
+            player.snapshots[0] if player.snapshots else None
+        )
+
+        if player_snapshot_changed(last_player_snapshot, snapshot_schema):
+            player_snapshot = PlayerSnapshotModel(
+                player=player,
+                name=snapshot_schema.name,
+                skin=snapshot_schema.skin,
+                cape=snapshot_schema.cape,
+            )
+            db.add(player_snapshot)
+
+        # Close previous session from another server if it is still open
+        last_player_session = player.sessions[0] if player.sessions else None
+
+        if last_player_session is not None and last_player_session.to is None:
+            last_player_session.to = func.now()
+
+    # Create new session on current server
+    player_session = PlayerSessionModel(server=server, player=player)
+    db.add(player_session)
+
+    return player
+
+
+def handle_players(
+    db: AsyncSession,
+    server: ServerModel,
+    check: ServerCheckSchema,
+    player_map: dict[PlayerSchema, PlayerModel],
+) -> None:
+    # 1. new player joined => save the new player + create new session for him
+    # 2. if player left => close his sessions
+    # 3. old player joined => create new session
+    # 4. if nothing changed => do nothing
+
+    active_sessions = {
+        s.player.uuid: s for s in server.player_sessions if s.to is None
+    }
+
+    incoming_players = {p.uuid: (p, snap) for p, snap in check.players.items()}
+
+    # players leaved the server
+    for uuid, session in active_sessions.items():
+        if uuid not in incoming_players:
+            session.to = func.now()
+
+    for uuid, (player_schema, snapshot_schema) in incoming_players.items():
+        # if the player is already online than do nothing
+        if uuid in active_sessions:
+            continue
+
+        # if player recently joined the server
+        handle_player_join(
+            db, player_map, server, player_schema, snapshot_schema
+        )
+
+
+def save_servers(
+    db: AsyncSession,
+    servers: list[tuple[ServerModel, ServerCheckSchema | None]],
+    ip_info: IpInfoSchema | None,
+    update_porter: bool,
+    em: ExistingEntityMapsSchema,
+) -> None:
+    for server, check in servers:
+        handle_ip_info_and_porter(server, ip_info, update_porter)
+
+        if handle_server_session(db, server, check) is None:
+            continue  # server is offline
+
+        handle_server_snapshot(
+            db,
+            server,
+            check,  # type: ignore
+            em.software_map,
+            em.plugin_map,
+            em.mod_map,
+        )
+        handle_dynamic_snapshot(db, server, check)  # type: ignore
+        handle_players(db, server, check, em.player_map)  # type: ignore

@@ -1,11 +1,6 @@
 from datetime import UTC, datetime
 
-from common.enums import (
-    AssetField,
-    DetectedServiceType,
-    ProtocolType,
-    ServerType,
-)
+from common.enums import DetectedServiceType, ProtocolType, ServerType
 from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
 from common.schemas.ip import IpInfoSchema
 from common.schemas.mixins import LastSeenMixin, TimestampMixin
@@ -13,13 +8,8 @@ from common.schemas.player import PlayerSchema, PlayerSnapshotSchema
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ServerSchema(IpInfoSchema, TimestampMixin, LastSeenMixin):  # type: ignore
+class IpSchema(IpInfoSchema, LastSeenMixin):  # type: ignore
     ip: str
-    port: int
-    server_type: ServerType
-    is_lan: bool
-    is_multiport: bool = False
-
     last_ip_check_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC)
     )
@@ -28,7 +18,14 @@ class ServerSchema(IpInfoSchema, TimestampMixin, LastSeenMixin):  # type: ignore
     )
 
 
-class ServerPortSchema(BaseModel):  # type: ignore
+class ServerSchema(TimestampMixin):  # type: ignore
+    port: int
+    server_type: ServerType
+    is_lan: bool
+    is_multiport: bool = False
+
+
+class IpPortSchema(BaseModel):  # type: ignore
     model_config = ConfigDict(frozen=True)
 
     port: int
@@ -80,18 +77,3 @@ class ServerCheckSchema(BaseModel):  # type: ignore
     software: SoftwareSchema
     mods: list[ModSchema]
     plugins: list[PluginSchema]
-
-
-class PendingServerAssetSchema(BaseModel):  # type: ignore
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    owner: ServerSnapshotSchema | PlayerSnapshotSchema
-    field: AssetField
-
-    prefix: str
-    content_type: str | None = None
-
-    source: str
-    is_base64: bool
-
-    data: bytes | None = None

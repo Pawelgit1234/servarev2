@@ -136,7 +136,6 @@ async def check_java_server(ip: str, port: int) -> ServerCheckSchema | None:
     # --- schemas ---
     return ServerCheckSchema(
         server=ServerSchema(
-            ip=ip,
             port=port,
             server_type=ServerType.JAVA,
             is_lan=is_lan(
@@ -176,7 +175,6 @@ async def check_bedrock_server(ip: str, port: int) -> ServerCheckSchema | None:
 
     return ServerCheckSchema(
         server=ServerSchema(
-            ip=ip,
             port=port,
             server_type=ServerType.BEDROCK,
             is_lan=False,
@@ -214,7 +212,6 @@ async def check_legacy_server(ip: str, port: int) -> ServerCheckSchema | None:
 
     return ServerCheckSchema(
         server=ServerSchema(
-            ip=ip,
             port=port,
             server_type=ServerType.LEGACY,
             is_lan=is_lan(

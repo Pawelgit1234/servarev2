@@ -15,17 +15,17 @@ from common.models.assets import (
 )
 from common.models.player import PlayerModel
 from common.models.server import (
+    IpPortModel,
     ServerModel,
     ServerPortAssociationModel,
-    ServerPortModel,
     ServerSnapshotModel,
 )
 from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
 from common.schemas.player import PlayerSchema, PlayerSnapshotSchema
 from common.schemas.server import (
+    IpPortSchema,
     ServerCheckSchema,
     ServerDynamicSnapshotSchema,
-    ServerPortSchema,
     ServerSchema,
     ServerSnapshotSchema,
 )
@@ -351,7 +351,7 @@ async def test_save_non_existing_servers_reuses_existing_assets(
 async def test_save_ports_create_new_server_and_port(
     db: AsyncSession,
 ) -> None:
-    port = ServerPortSchema(
+    port = IpPortSchema(
         port=80,
         protocol_type=ProtocolType.TCP,
         detected_service_type=DetectedServiceType.BLUEMAP,
@@ -379,7 +379,7 @@ async def test_save_ports_create_new_server_and_port(
     await db.commit()
 
     assert await db.scalar(select(func.count(ServerModel.id))) == 1
-    assert await db.scalar(select(func.count(ServerPortModel.id))) == 1
+    assert await db.scalar(select(func.count(IpPortModel.id))) == 1
     assert (
         await db.scalar(
             select(func.count(ServerPortAssociationModel.server_id))
@@ -402,7 +402,7 @@ async def test_save_ports_reuse_existing_server(
     db.add(server)
     await db.commit()
 
-    port = ServerPortSchema(
+    port = IpPortSchema(
         port=80,
         protocol_type=ProtocolType.TCP,
         detected_service_type=DetectedServiceType.BLUEMAP,
@@ -457,7 +457,7 @@ async def test_save_ports_reuse_existing_port_and_association(
         is_multiport=False,
     )
 
-    existing_port = ServerPortModel(
+    existing_port = IpPortModel(
         port=80,
         protocol_type=ProtocolType.TCP,
         detected_service_type=DetectedServiceType.BLUEMAP,
@@ -472,12 +472,12 @@ async def test_save_ports_reuse_existing_port_and_association(
     await db.commit()
 
     ports = [
-        ServerPortSchema(
+        IpPortSchema(
             port=80,
             protocol_type=ProtocolType.TCP,
             detected_service_type=DetectedServiceType.BLUEMAP,
         ),
-        ServerPortSchema(
+        IpPortSchema(
             port=443,
             protocol_type=ProtocolType.TCP,
             detected_service_type=DetectedServiceType.PELICAN,
@@ -513,7 +513,7 @@ async def test_save_ports_reuse_existing_port_and_association(
     await save_ports(db, ports, [check], "1.1.1.1")
     await db.commit()
 
-    all_ports = (await db.execute(select(ServerPortModel))).scalars().all()
+    all_ports = (await db.execute(select(IpPortModel))).scalars().all()
 
     associations = (
         (await db.execute(select(ServerPortAssociationModel))).scalars().all()

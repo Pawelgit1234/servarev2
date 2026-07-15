@@ -8,10 +8,10 @@ from common.checks.server import (
     check_legacy_server,
 )
 from common.enums import DetectedServiceType, ProtocolType
-from common.schemas.server import ServerCheckSchema, ServerPortSchema
+from common.schemas.server import IpPortSchema, IpSchema, ServerCheckSchema
 from common.session import session_manager
 from common.settings import CHECKER_PORT_CONCURRENCY
-from common.utils import merge_server_check_with_ip_info
+from common.utils import ip_info_to_ip_schema
 
 from checker.schemas import MasscanAddressSchema, PorterSchema
 
@@ -71,7 +71,7 @@ SIGNATURES: dict[DetectedServiceType, list[str]] = {
 async def detect_service(
     ip: str,
     port: int,
-) -> ServerPortSchema:
+) -> IpPortSchema:
     """Detects HTTP-based services."""
 
     url = f"http://{ip}:{port}"
@@ -84,7 +84,7 @@ async def detect_service(
             text = await resp.text(errors="ignore")
 
     except (TimeoutError, ClientError):
-        return ServerPortSchema(
+        return IpPortSchema(
             port=port,
             protocol_type=ProtocolType.TCP,
             detected_service_type=DetectedServiceType.UNKNOWN,
@@ -99,7 +99,7 @@ async def detect_service(
             detected = service_type
             break
 
-    return ServerPortSchema(
+    return IpPortSchema(
         port=port,
         protocol_type=ProtocolType.TCP,
         detected_service_type=detected,
@@ -108,30 +108,30 @@ async def detect_service(
 
 async def check_server(
     masscan: MasscanAddressSchema,
-) -> ServerCheckSchema | None:
-    server = await check_server_by_protocol(
+) -> tuple[ServerCheckSchema, IpSchema] | None:
+    check = await check_server_by_protocol(
         masscan.protocol, masscan.ip, masscan.port
     )
-    if server is None:
+    if check is None:
         return None
 
-    server.server.is_multiport = masscan.is_multiport
+    check.server.is_multiport = masscan.is_multiport
 
     ip_info = await get_ip_info(masscan.ip)
-    merge_server_check_with_ip_info(server, ip_info)
-    return server
+    ip = ip_info_to_ip_schema(ip_info, masscan.ip)
+    return check, ip
 
 
 async def limited_check(
     p: PorterSchema, ip: str
-) -> ServerPortSchema | ServerCheckSchema:
+) -> IpPortSchema | ServerCheckSchema:
     async with s:
         server = await check_server_by_protocol(p.protocol, ip, p.port)
         if server is not None:
             return server
 
         if p.protocol == ProtocolType.UDP:
-            return ServerPortSchema(
+            return IpPortSchema(
                 port=p.port,
                 protocol_type=ProtocolType.UDP,
                 detected_service_type=DetectedServiceType.UNKNOWN,
@@ -140,13 +140,13 @@ async def limited_check(
         return await detect_service(ip, p.port)
 
 
-async def scan_ports(
+async def check_server_ports(
     ports: list[PorterSchema], ip: str
-) -> tuple[list[ServerPortSchema], list[ServerCheckSchema]]:
+) -> tuple[list[IpPortSchema], list[ServerCheckSchema]]:
     tasks = [limited_check(p, ip) for p in ports]
     results = await asyncio.gather(*tasks)
 
-    server_ports: list[ServerPortSchema] = []
+    server_ports: list[IpPortSchema] = []
     servers: list[ServerCheckSchema] = []
 
     for result in results:
@@ -156,16 +156,3 @@ async def scan_ports(
             server_ports.append(result)
 
     return server_ports, servers
-
-
-async def check_server_ports(
-    ports: list[PorterSchema], ip: str
-) -> tuple[list[ServerPortSchema], list[ServerCheckSchema]]:
-    ports, servers = await scan_ports(ports, ip)  # type: ignore
-
-    if len(servers) != 0:
-        ip_info = await get_ip_info(ip)
-        for server in servers:
-            merge_server_check_with_ip_info(server, ip_info)
-
-    return ports, servers  # type: ignore
