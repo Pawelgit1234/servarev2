@@ -18,12 +18,11 @@ from common.services.assets import (
     ensure_plugin,
     ensure_software,
 )
-from common.services.common import load_existing_entities
+from common.services.entities import load_existing_entities
 from common.services.server import handle_player_join, save_servers
+from common.utils import extract_entities_from_checks
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from checker.utils import extract_entities_from_checks
 
 
 async def is_server_in_db(db: AsyncSession, ip: str, port: int) -> bool:
@@ -66,10 +65,6 @@ def ensure_ip_port(
         port_map[key] = port
 
     return port
-
-
-# TODO: наверняка можно соединить save_non_existing_servers и save_servers
-# или по крайне мере сделать так, чтобы меньше кода повторялось ???
 
 
 def save_non_existing_servers(
@@ -146,7 +141,7 @@ async def save_porter(
     checks: list[ServerCheckSchema],
     ip: IpModel,
 ) -> None:
-    if checks:
+    if checks:  # if not len(checks) == 0, save time by not loading entities
         existing_servers_map = {s.port: s for s in ip.servers}
 
         new_servers: list[ServerCheckSchema] = []
@@ -159,16 +154,15 @@ async def save_porter(
             else:
                 old_servers.append((server, check))
 
-        entities = extract_entities_from_checks(new_servers)
+        entities = extract_entities_from_checks(checks)
         entity_maps = await load_existing_entities(db, entities)
+
         save_non_existing_servers(db, new_servers, ip, entity_maps)
         save_servers(db, old_servers, entity_maps)  # type: ignore
 
-    if ports:
-        port_map = {
-            (p.port, p.protocol_type, p.detected_service_type): p
-            for p in ip.ports
-        }
+    port_map = {
+        (p.port, p.protocol_type, p.detected_service_type): p for p in ip.ports
+    }
 
-        for port_schema in ports:
-            ensure_ip_port(db, ip, port_map, port_schema)
+    for port_schema in ports:
+        ensure_ip_port(db, ip, port_map, port_schema)

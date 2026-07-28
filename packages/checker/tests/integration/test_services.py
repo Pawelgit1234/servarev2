@@ -1,4 +1,4 @@
-from checker.services import save_non_existing_servers, save_ports
+from checker.services import save_non_existing_servers, save_porter
 from common.enums import (
     DetectedServiceType,
     PlayerType,
@@ -15,9 +15,9 @@ from common.models.assets import (
 )
 from common.models.player import PlayerModel
 from common.models.server import (
+    IpModel,
     IpPortModel,
     ServerModel,
-    ServerPortAssociationModel,
     ServerSnapshotModel,
 )
 from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
@@ -29,6 +29,8 @@ from common.schemas.server import (
     ServerSchema,
     ServerSnapshotSchema,
 )
+from common.services.entities import load_existing_entities
+from common.utils import extract_entities_from_checks
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -38,20 +40,25 @@ from sqlalchemy.orm import selectinload
 async def test_save_non_existing_servers(
     db: AsyncSession,
 ) -> None:
+    ip = IpModel(
+        ip="1.1.1.1",
+        is_multiport=True,
+        country="US",
+        region="Region1",
+        city="City1",
+        latitude=1.0,
+        longitude=2.0,
+        hostname="host1",
+        asn="123",
+    )
+    db.add(ip)
+
     check1 = ServerCheckSchema(
         server=ServerSchema(
             ip="1.1.1.1",
             port=25565,
             server_type=ServerType.JAVA,
             is_lan=False,
-            is_multiport=False,
-            country="US",
-            region="Region1",
-            city="City1",
-            latitude=1.0,
-            longitude=2.0,
-            hostname="host1",
-            asn="123",
         ),
         server_snapshot=ServerSnapshotSchema(
             version="1.20.1",
@@ -93,18 +100,10 @@ async def test_save_non_existing_servers(
 
     check2 = ServerCheckSchema(
         server=ServerSchema(
-            ip="2.2.2.2",
+            ip="1.1.1.1",
             port=25566,
             server_type=ServerType.JAVA,
             is_lan=True,
-            is_multiport=True,
-            country="RU",
-            region="Region2",
-            city="City2",
-            latitude=3.0,
-            longitude=4.0,
-            hostname="host2",
-            asn="456",
         ),
         server_snapshot=ServerSnapshotSchema(
             version="1.21",
@@ -144,7 +143,16 @@ async def test_save_non_existing_servers(
         ],
     )
 
-    servers = await save_non_existing_servers(db, [check1, check2])
+    entities = extract_entities_from_checks([check1, check2])
+    entity_maps = await load_existing_entities(db, entities)
+
+    servers = save_non_existing_servers(
+        db,
+        [check1, check2],
+        ip,
+        entity_maps,
+    )
+
     await db.commit()
 
     assert len(servers) == 2
@@ -155,6 +163,7 @@ async def test_save_non_existing_servers(
         (
             await db.execute(
                 select(ServerModel).options(
+                    selectinload(ServerModel.ip),
                     selectinload(ServerModel.snapshots).selectinload(
                         ServerSnapshotModel.software
                     ),
@@ -175,11 +184,29 @@ async def test_save_non_existing_servers(
 
     assert len(saved_servers) == 2
 
-    server1 = next(s for s in saved_servers if s.ip == "1.1.1.1")
-    server2 = next(s for s in saved_servers if s.ip == "2.2.2.2")
+    server1 = next(server for server in saved_servers if server.port == 25565)
+    server2 = next(server for server in saved_servers if server.port == 25566)
 
-    assert server1.country == "US"
-    assert server2.country == "RU"
+    # Both servers belong to the same IP.
+    assert server1.ip.ip == "1.1.1.1"
+    assert server2.ip.ip == "1.1.1.1"
+    assert server1.ip.id == server2.ip.id
+
+    # IP-level data is stored on IpModel.
+    assert server1.ip.is_multiport is True
+    assert server1.ip.country == "US"
+    assert server1.ip.region == "Region1"
+    assert server1.ip.city == "City1"
+    assert server1.ip.latitude == 1.0
+    assert server1.ip.longitude == 2.0
+    assert server1.ip.hostname == "host1"
+    assert server1.ip.asn == "123"
+
+    assert server1.port == 25565
+    assert server2.port == 25566
+
+    assert server1.is_lan is False
+    assert server2.is_lan is True
 
     assert len(server1.sessions) == 1
     assert len(server2.sessions) == 1
@@ -207,6 +234,7 @@ async def test_save_non_existing_servers(
     assert {a.mod.name for a in snapshot2.mod_associations} == {"WorldEdit"}
 
     players = (await db.execute(select(PlayerModel))).scalars().all()
+
     assert len(players) == 2
 
 
@@ -226,20 +254,26 @@ async def test_save_non_existing_servers_reuses_existing_assets(
     db.add_all([existing_software, existing_plugin, existing_mod])
     await db.commit()
 
+    ip = IpModel(
+        ip="1.1.1.1",
+        is_multiport=False,
+        country="US",
+        region="Region",
+        city="City",
+        latitude=1.0,
+        longitude=2.0,
+        hostname="host",
+        asn="123",
+    )
+    db.add(ip)
+
+    await db.flush()
+
     check = ServerCheckSchema(
         server=ServerSchema(
-            ip="1.1.1.1",
             port=25565,
             server_type=ServerType.JAVA,
             is_lan=False,
-            is_multiport=False,
-            country="US",
-            region="Region",
-            city="City",
-            latitude=1.0,
-            longitude=2.0,
-            hostname="host",
-            asn="123",
         ),
         server_snapshot=ServerSnapshotSchema(
             version="1.20.1",
@@ -272,17 +306,28 @@ async def test_save_non_existing_servers_reuses_existing_assets(
             version="1.20.1",
         ),
         plugins=[
-            PluginSchema(name="Essentials"),  # already exists
-            PluginSchema(name="LuckPerms"),  # new
+            PluginSchema(name="Essentials"),
+            PluginSchema(name="LuckPerms"),
         ],
         mods=[
-            ModSchema(name="FabricAPI", version="0.1"),  # already exists
-            ModSchema(name="WorldEdit", version="7.3"),  # new
+            ModSchema(name="FabricAPI", version="0.1"),
+            ModSchema(name="WorldEdit", version="7.3"),
         ],
     )
 
-    await save_non_existing_servers(db, [check])
+    entities = extract_entities_from_checks([check])
+    entity_maps = await load_existing_entities(db, entities)
+
+    servers = save_non_existing_servers(
+        db,
+        [check],
+        ip,
+        entity_maps,
+    )
+
     await db.commit()
+
+    assert len(servers) == 1
 
     existing_software_id = existing_software.id
     existing_plugin_id = existing_plugin.id
@@ -291,7 +336,9 @@ async def test_save_non_existing_servers_reuses_existing_assets(
     db.expire_all()
 
     softwares = (await db.execute(select(SoftwareModel))).scalars().all()
+
     plugins = (await db.execute(select(PluginModel))).scalars().all()
+
     mods = (await db.execute(select(ModModel))).scalars().all()
 
     assert len(softwares) == 1
@@ -299,7 +346,8 @@ async def test_save_non_existing_servers_reuses_existing_assets(
     assert len(mods) == 2
 
     server = await db.scalar(
-        select(ServerModel).options(
+        select(ServerModel)
+        .options(
             selectinload(ServerModel.snapshots).selectinload(
                 ServerSnapshotModel.software
             ),
@@ -310,27 +358,43 @@ async def test_save_non_existing_servers_reuses_existing_assets(
             .selectinload(ServerSnapshotModel.mod_associations)
             .selectinload(ServerSnapshotModAssociationModel.mod),
         )
+        .where(
+            ServerModel.port == 25565,
+        )
     )
 
     assert server is not None
+    assert server.ip_id == ip.id
 
     snapshot = server.snapshots[0]
 
-    # software must be reused
+    # Software must be reused.
+    assert snapshot.software is not None
     assert snapshot.software.id == existing_software_id
 
     plugin_names = {
         assoc.plugin.name for assoc in snapshot.plugin_associations
     }
-    assert plugin_names == {"Essentials", "LuckPerms"}
+
+    assert plugin_names == {
+        "Essentials",
+        "LuckPerms",
+    }
 
     mod_names = {assoc.mod.name for assoc in snapshot.mod_associations}
-    assert mod_names == {"FabricAPI", "WorldEdit"}
 
-    # already existing assets must be reused
+    assert mod_names == {
+        "FabricAPI",
+        "WorldEdit",
+    }
+
+    # Already existing assets must be reused.
     essentials = await db.scalar(
-        select(PluginModel).where(PluginModel.name == "Essentials")
+        select(PluginModel).where(
+            PluginModel.name == "Essentials",
+        )
     )
+
     fabric_api = await db.scalar(
         select(ModModel).where(
             ModModel.name == "FabricAPI",
@@ -348,59 +412,13 @@ async def test_save_non_existing_servers_reuses_existing_assets(
 # == Tests for "save_ports" ==
 
 
-async def test_save_ports_create_new_server_and_port(
-    db: AsyncSession,
-) -> None:
-    port = IpPortSchema(
-        port=80,
-        protocol_type=ProtocolType.TCP,
-        detected_service_type=DetectedServiceType.BLUEMAP,
-    )
-
-    check = ServerCheckSchema(
-        server=ServerSchema(
-            ip="1.1.1.1",
-            port=25565,
-            server_type=ServerType.JAVA,
-            is_lan=False,
-            is_multiport=False,
-        ),
-        server_snapshot=ServerSnapshotSchema(
-            version="1.20", players_max=20, motd="test", latency=1
-        ),
-        server_dynamic_snapshot=ServerDynamicSnapshotSchema(players_online=0),
-        players={},
-        software=SoftwareSchema(name=ServerSoftwareType.PAPER, version="1.20"),
-        plugins=[],
-        mods=[],
-    )
-
-    await save_ports(db, [port], [check], "1.1.1.1")
-    await db.commit()
-
-    assert await db.scalar(select(func.count(ServerModel.id))) == 1
-    assert await db.scalar(select(func.count(IpPortModel.id))) == 1
-    assert (
-        await db.scalar(
-            select(func.count(ServerPortAssociationModel.server_id))
-        )
-        == 1
-    )
-
-
-async def test_save_ports_reuse_existing_server(
-    db: AsyncSession,
-) -> None:
-    server = ServerModel(
+async def test_save_ports_create_new_server_and_port(db: AsyncSession) -> None:
+    ip = IpModel(
         ip="1.1.1.1",
-        port=25565,
-        server_type=ServerType.JAVA,
-        is_lan=False,
         is_multiport=False,
     )
-
-    db.add(server)
-    await db.commit()
+    db.add(ip)
+    await db.flush()
 
     port = IpPortSchema(
         port=80,
@@ -434,42 +452,112 @@ async def test_save_ports_reuse_existing_server(
         mods=[],
     )
 
-    await save_ports(db, [port], [check], "1.1.1.1")
+    await save_porter(db, [port], [check], ip)
     await db.commit()
 
-    servers = (await db.execute(select(ServerModel))).scalars().all()
-    assert len(servers) == 1
+    assert await db.scalar(select(func.count(ServerModel.id))) == 1
+    assert await db.scalar(select(func.count(IpPortModel.id))) == 1
 
-    assoc = await db.scalar(select(ServerPortAssociationModel))
+    server = await db.scalar(
+        select(ServerModel).where(
+            ServerModel.ip_id == ip.id,
+            ServerModel.port == 25565,
+        )
+    )
+    assert server is not None
 
-    assert assoc is not None
-    assert assoc.server_id == server.id
 
-
-async def test_save_ports_reuse_existing_port_and_association(
-    db: AsyncSession,
-) -> None:
-    server = ServerModel(
+async def test_save_ports_reuse_existing_server(db: AsyncSession) -> None:
+    ip = IpModel(
         ip="1.1.1.1",
+        is_multiport=False,
+    )
+    db.add(ip)
+
+    server = ServerModel(
+        ip=ip,
         port=25565,
         server_type=ServerType.JAVA,
         is_lan=False,
-        is_multiport=False,
     )
+    db.add(server)
+    await db.commit()
 
-    existing_port = IpPortModel(
+    server_id = server.id
+
+    port = IpPortSchema(
         port=80,
         protocol_type=ProtocolType.TCP,
         detected_service_type=DetectedServiceType.BLUEMAP,
     )
 
-    assoc = ServerPortAssociationModel(
-        server=server,
-        server_port=existing_port,
+    check = ServerCheckSchema(
+        server=ServerSchema(
+            port=25565,
+            server_type=ServerType.JAVA,
+            is_lan=False,
+        ),
+        server_snapshot=ServerSnapshotSchema(
+            version="1.20",
+            players_max=20,
+            motd="test",
+            latency=1,
+        ),
+        server_dynamic_snapshot=ServerDynamicSnapshotSchema(
+            players_online=0,
+        ),
+        players={},
+        software=SoftwareSchema(
+            name=ServerSoftwareType.PAPER,
+            version="1.20",
+        ),
+        plugins=[],
+        mods=[],
     )
 
-    db.add_all([server, existing_port, assoc])
+    await save_porter(db, [port], [check], ip)
     await db.commit()
+
+    servers = (await db.execute(select(ServerModel))).scalars().all()
+
+    assert len(servers) == 1
+
+    server = await db.scalar(
+        select(ServerModel).where(ServerModel.id == server_id)
+    )  # type: ignore
+
+    assert server is not None
+    assert server.port == 25565
+
+    assert await db.scalar(select(func.count(IpPortModel.id))) == 1
+
+
+async def test_save_ports_reuse_existing_port(db: AsyncSession) -> None:
+    ip = IpModel(
+        ip="1.1.1.1",
+        is_multiport=False,
+    )
+    db.add(ip)
+    await db.flush()
+
+    server = ServerModel(
+        ip=ip,
+        port=25565,
+        server_type=ServerType.JAVA,
+        is_lan=False,
+    )
+
+    existing_port = IpPortModel(
+        ip=ip,
+        port=80,
+        protocol_type=ProtocolType.TCP,
+        detected_service_type=DetectedServiceType.BLUEMAP,
+    )
+
+    db.add_all([server, existing_port])
+    await db.commit()
+
+    existing_port_id = existing_port.id
 
     ports = [
         IpPortSchema(
@@ -486,11 +574,9 @@ async def test_save_ports_reuse_existing_port_and_association(
 
     check = ServerCheckSchema(
         server=ServerSchema(
-            ip="1.1.1.1",
             port=25565,
             server_type=ServerType.JAVA,
             is_lan=False,
-            is_multiport=False,
         ),
         server_snapshot=ServerSnapshotSchema(
             version="1.20",
@@ -510,20 +596,30 @@ async def test_save_ports_reuse_existing_port_and_association(
         mods=[],
     )
 
-    await save_ports(db, ports, [check], "1.1.1.1")
+    await save_porter(db, ports, [check], ip)
     await db.commit()
 
-    all_ports = (await db.execute(select(IpPortModel))).scalars().all()
-
-    associations = (
-        (await db.execute(select(ServerPortAssociationModel))).scalars().all()
+    all_ports = (
+        (
+            await db.execute(
+                select(IpPortModel).where(IpPortModel.ip_id == ip.id)
+            )
+        )
+        .scalars()
+        .all()
     )
 
     assert len(all_ports) == 2
-    assert len(associations) == 2
 
     existing = next(p for p in all_ports if p.port == 80)
     new = next(p for p in all_ports if p.port == 443)
 
-    assert existing.id == existing_port.id
-    assert new.id != existing_port.id
+    # Existing port was reused.
+    assert existing.id == existing_port_id
+
+    # New port was created.
+    assert new.id != existing_port_id
+
+    # Both ports belong to the same IP.
+    assert existing.ip_id == ip.id
+    assert new.ip_id == ip.id

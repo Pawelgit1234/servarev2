@@ -33,6 +33,38 @@ def is_offline_uuid(name: str, u: str) -> bool:
     return str(expected) == str(uuid.UUID(u))
 
 
+async def fetch_player_snapshot(u: str) -> PlayerSnapshotSchema | None:
+    try:
+        async with (
+            s,
+            session_manager.session.get(f"{SESSION_URL}/{u}") as resp,
+        ):
+            if resp.status != 200:
+                return None
+
+            data = await resp.json()
+
+    except (TimeoutError, ClientError):
+        return None
+
+    properties = data.get("properties", [])
+    name = data["name"]
+    skin = cape = None
+
+    if properties:
+        value = properties[0].get("value")
+        if value:
+            decoded = json.loads(base64.b64decode(value))
+            skin = decoded["textures"].get("SKIN", {}).get("url")
+            cape = decoded["textures"].get("CAPE", {}).get("url")
+
+    return PlayerSnapshotSchema(
+        name=name,
+        skin=skin,
+        cape=cape,
+    )
+
+
 async def fetch_profile(
     name: str, uuid_raw: str
 ) -> tuple[PlayerSchema, PlayerSnapshotSchema]:

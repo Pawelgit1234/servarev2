@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 
-class IpInfoSchema(BaseModel):
+class IpInfoSchema(BaseModel):  # type: ignore
     country: str | None = None
     region: str | None = None
     city: str | None = None

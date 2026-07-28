@@ -1,5 +1,6 @@
 from common.checks.ip import get_ip_info
 from common.databases import ra
+from common.enums import PlayerType
 from common.models.assets import (
     ServerSnapshotModAssociationModel,
     ServerSnapshotPluginAssociationModel,
@@ -200,6 +201,50 @@ async def get_next_ip(
                 PlayerModel.snapshots,
                 alias=latest_player_snapshot_alias,
             ),
+        )
+    )
+
+    return (await db.execute(stmt)).scalars().unique().one_or_none()
+
+
+async def get_next_premium_player(db: AsyncSession) -> PlayerModel | None:
+    locked_player_subquery = (
+        select(PlayerModel.id)
+        .where(PlayerModel.player_type == PlayerType.PREMIUM)
+        .order_by(PlayerModel.last_seen_at.asc())
+        .limit(1)
+        .with_for_update(skip_locked=True)
+        .scalar_subquery()
+    )
+
+    updated_player = (
+        update(PlayerModel)
+        .where(PlayerModel.id == locked_player_subquery)
+        .values(last_seen_at=func.now())
+        .returning(PlayerModel.id)
+        .cte("updated_player")
+    )
+
+    latest_snapshot = (
+        select(PlayerSnapshotModel)
+        .distinct(PlayerSnapshotModel.player_id)
+        .order_by(
+            PlayerSnapshotModel.player_id,
+            PlayerSnapshotModel.created_at.desc(),
+        )
+        .subquery()
+    )
+    latest_snapshot_alias = aliased(PlayerSnapshotModel, latest_snapshot)
+
+    stmt = (
+        select(PlayerModel)
+        .where(PlayerModel.id.in_(select(updated_player.c.id)))
+        .outerjoin(
+            latest_snapshot_alias,
+            latest_snapshot_alias.player_id == PlayerModel.id,
+        )
+        .options(
+            contains_eager(PlayerModel.snapshots, alias=latest_snapshot_alias),
         )
     )
 

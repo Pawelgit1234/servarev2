@@ -1,7 +1,7 @@
 import os
 
 
-def get_int(name: str) -> None | int:
+def get_int(name: str) -> int | None:
     env = os.getenv(name)
     if env is not None:
         return int(env)
@@ -23,6 +23,8 @@ SCANNER_MULTIPORT_IP_SUFFIX = "multiport"
 
 REDIS_IP_QUEUE = "ips"  # scanner -> checker
 REDIS_PORTER_QUEUE = "porter"  # checker -> porter
+
+DB_RETRY_DELAY_SECONDS = get_int("DB_RETRY_DELAY_SECONDS")
 
 COUNTRY_MAX = 2
 REGION_MAX = 100
@@ -48,7 +50,6 @@ MASSCAN_RATE_TARGET = get_int("MASSCAN_RATE_TARGET")
 CHECKER_CONCURRENCY = get_int("CHECKER_CONCURRENCY")
 CHECKER_PORT_CONCURRENCY = get_int("CHECKER_PORT_CONCURRENCY")
 MONITOR_SERVER_CONCURRENCY = get_int("MONITOR_SERVER_CONCURRENCY")
-MONITOR_PORT_CONCURRENCY = get_int("MONITOR_PORT_CONCURRENCY")
 MONITOR_PLAYER_CONCURRENCY = get_int("MONITOR_PLAYER_CONCURRENCY")
 PORTER_BATCH_SIZE = get_int("PORTER_BATCH_SIZE")
 SERVER_CHECK_TIMEOUT = get_int("SERVER_CHECK_TIMEOUT")

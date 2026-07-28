@@ -1,22 +1,13 @@
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import TypeVar
 
 from common.checks.player import download_by_url
 from common.enums import AssetField
 from common.s3client import s3
-from common.schemas.common import (
-    ExistingEntityMapsSchema,
-    ExtractedEntitiesSchema,
-    PendingServerAssetSchema,
-)
+from common.schemas.common import PendingServerAssetSchema
+from common.schemas.player import PlayerSnapshotSchema
 from common.schemas.server import ServerCheckSchema
-from common.services.assets import (
-    load_existing_mods,
-    load_existing_plugins,
-    load_existing_softwares,
-)
-from common.services.player import load_existing_players
 from common.settings import S3_CAPE_PREFIX, S3_ICON_PREFIX, S3_SKIN_PREFIX
 from common.utils import decode_base64
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,15 +32,33 @@ def ensure_entity[SchemaT, ModelT](
     return entity
 
 
-async def load_existing_entities(
-    db: AsyncSession, ee: ExtractedEntitiesSchema
-) -> ExistingEntityMapsSchema:
-    return ExistingEntityMapsSchema(
-        software_map=await load_existing_softwares(db, ee.softwares),
-        plugin_map=await load_existing_plugins(db, ee.plugins),
-        mod_map=await load_existing_mods(db, ee.mods),
-        player_map=await load_existing_players(db, ee.players),
-    )
+def collect_player_assets(
+    player_snapshots: Iterable[PlayerSnapshotSchema],
+) -> list[PendingServerAssetSchema]:
+    assets = []
+    for snapshot in player_snapshots:
+        if snapshot.skin is not None:
+            assets.append(
+                PendingServerAssetSchema(
+                    owner=snapshot,
+                    field=AssetField.SKIN,
+                    prefix=S3_SKIN_PREFIX,
+                    source=snapshot.skin,
+                    is_base64=False,
+                )
+            )
+
+        if snapshot.cape is not None:
+            assets.append(
+                PendingServerAssetSchema(
+                    owner=snapshot,
+                    field=AssetField.CAPE,
+                    prefix=S3_CAPE_PREFIX,
+                    source=snapshot.cape,
+                    is_base64=False,
+                )
+            )
+    return assets
 
 
 def collect_assets(
@@ -72,28 +81,7 @@ def collect_assets(
                 )
             )
 
-        for snapshot in server.players.values():
-            if snapshot.skin is not None:
-                assets.append(
-                    PendingServerAssetSchema(
-                        owner=snapshot,
-                        field=AssetField.SKIN,
-                        prefix=S3_SKIN_PREFIX,
-                        source=snapshot.skin,
-                        is_base64=False,
-                    )
-                )
-
-            if snapshot.cape is not None:
-                assets.append(
-                    PendingServerAssetSchema(
-                        owner=snapshot,
-                        field=AssetField.CAPE,
-                        prefix=S3_CAPE_PREFIX,
-                        source=snapshot.cape,
-                        is_base64=False,
-                    )
-                )
+        assets.extend(collect_player_assets(server.players.values()))
 
     return assets
 
@@ -132,6 +120,13 @@ async def upload_servers(
     servers: list[ServerCheckSchema],
 ) -> None:
     assets = collect_assets(servers)
+
+    await prepare_assets(assets)
+    await upload_assets(assets)
+
+
+async def upload_players(player_snapshots: list[PlayerSnapshotSchema]) -> None:
+    assets = collect_player_assets(player_snapshots)
 
     await prepare_assets(assets)
     await upload_assets(assets)

@@ -90,8 +90,8 @@ services:
       - REDIS_PORT=6379
       - SERVER_CHECK_TIMEOUT=${SERVER_CHECK_TIMEOUT}
       - MONITOR_SERVER_CONCURRENCY=${MONITOR_SERVER_CONCURRENCY}
-      - MONITOR_PORT_CONCURRENCY=${MONITOR_PORT_CONCURRENCY}
       - MONITOR_PLAYER_CONCURRENCY=${MONITOR_PLAYER_CONCURRENCY}
+      - DB_RETRY_DELAY_SECONDS=${DB_RETRY_DELAY_SECONDS}
       - S3_PUBLIC_ENDPOINT=${S3_PUBLIC_ENDPOINT}
       - S3_ROOT_USER=${S3_ROOT_USER}
       - S3_ROOT_PASSWORD=${S3_ROOT_PASSWORD}
@@ -161,7 +161,7 @@ services:
     ports:
       - 5432:5432
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
   
   pgweb:
     image: sosedoff/pgweb:0.17.0

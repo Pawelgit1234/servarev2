@@ -8,9 +8,6 @@ from common.checks.server import (
 from common.enums import ServerType
 from common.models.server import ServerModel
 from common.schemas.server import ServerCheckSchema
-from common.settings import MONITOR_PORT_CONCURRENCY
-
-s = asyncio.Semaphore(MONITOR_PORT_CONCURRENCY)  # type: ignore
 
 CHECKERS = {
     ServerType.JAVA: check_java_server,
@@ -22,9 +19,8 @@ CHECKERS = {
 async def check_server_by_type(
     ip: str, port: int, server_type: ServerType
 ) -> ServerCheckSchema | None:
-    async with s:
-        checker = CHECKERS[server_type]
-        server = await checker(ip, port)
+    checker = CHECKERS[server_type]
+    server = await checker(ip, port)
     return server
 
 

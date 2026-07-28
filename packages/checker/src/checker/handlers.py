@@ -2,10 +2,12 @@ import logging
 
 from common.checks.ip import get_ip_info
 from common.databases import async_session, ra
-from common.services.common import load_existing_entities, upload_servers
+from common.services.common import upload_servers
+from common.services.entities import load_existing_entities
 from common.services.server import create_ip, get_ip
 from common.settings import REDIS_PORTER_QUEUE
 from common.utils import (
+    extract_entities_from_checks,
     ip_info_to_ip_schema,
     normilize_ip,
     normilize_server_check,
@@ -18,7 +20,6 @@ from checker.services import (
     save_non_existing_servers,
     save_porter,
 )
-from checker.utils import extract_entities_from_checks
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +28,14 @@ async def handle_masscan(address: str) -> None:
     masscan = parse_masscan_address(address)
 
     async with async_session() as db:  # type: ignore
-        if await is_server_in_db(db, masscan.ip, masscan.port):
-            return
-
         # Server check
         check = await check_server_by_protocol(
             masscan.protocol, masscan.ip, masscan.port
         )
         if check is None:
+            return
+
+        if await is_server_in_db(db, masscan.ip, masscan.port):
             return
 
         # Ip

@@ -161,6 +161,27 @@ def handle_dynamic_snapshot(
         db.add(last_dynamic_snapshot)
 
 
+def create_player_snapshot_if_changed(
+    db: AsyncSession,
+    player: PlayerModel,
+    snapshot_schema: PlayerSnapshotSchema,
+) -> PlayerSnapshotModel | None:
+    last_player_snapshot = player.snapshots[0] if player.snapshots else None
+
+    if not player_snapshot_changed(last_player_snapshot, snapshot_schema):
+        return None
+
+    player_snapshot = PlayerSnapshotModel(
+        player=player,
+        name=snapshot_schema.name,
+        skin=snapshot_schema.skin,
+        cape=snapshot_schema.cape,
+    )
+    db.add(player_snapshot)
+
+    return player_snapshot
+
+
 def handle_player_join(
     db: AsyncSession,
     player_map: dict[PlayerSchema, PlayerModel],
@@ -186,20 +207,9 @@ def handle_player_join(
         player_map[player_schema] = player
         db.add_all([player, player_snapshot])
 
+    # Player does exist
     else:
-        # Create new snapshot if player data changed
-        last_player_snapshot = (
-            player.snapshots[0] if player.snapshots else None
-        )
-
-        if player_snapshot_changed(last_player_snapshot, snapshot_schema):
-            player_snapshot = PlayerSnapshotModel(
-                player=player,
-                name=snapshot_schema.name,
-                skin=snapshot_schema.skin,
-                cape=snapshot_schema.cape,
-            )
-            db.add(player_snapshot)
+        create_player_snapshot_if_changed(db, player, snapshot_schema)
 
         # Close previous session from another server if it is still open
         last_player_session = player.sessions[0] if player.sessions else None

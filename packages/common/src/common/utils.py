@@ -9,8 +9,9 @@ from common.models.server import (
     ServerSnapshotModel,
 )
 from common.schemas.assets import ModSchema, PluginSchema, SoftwareSchema
+from common.schemas.common import ExtractedEntitiesSchema
 from common.schemas.ip import IpInfoSchema
-from common.schemas.player import PlayerSnapshotSchema
+from common.schemas.player import PlayerSchema, PlayerSnapshotSchema
 from common.schemas.server import (
     IpSchema,
     ServerCheckSchema,
@@ -115,6 +116,15 @@ def normilize_ip(ip: IpInfoSchema | IpSchema) -> None:
     )  # type: ignore
 
 
+def normalize_player_snapshot(
+    player_snapshot: PlayerSnapshotSchema | PlayerSnapshotModel,
+) -> None:
+    player_snapshot.name = _truncate(
+        player_snapshot.name,
+        USERNAME_MAX,
+    )  # type: ignore
+
+
 def normilize_server_check(server: ServerCheckSchema) -> None:
     # Snapshot
     server.server_snapshot.version = _truncate(
@@ -162,10 +172,7 @@ def normilize_server_check(server: ServerCheckSchema) -> None:
 
     # Players
     for player_snapshot in server.players.values():
-        player_snapshot.name = _truncate(
-            player_snapshot.name,
-            USERNAME_MAX,
-        )  # type: ignore
+        normalize_player_snapshot(player_snapshot)
 
 
 def player_snapshot_changed(
@@ -271,4 +278,26 @@ def need_create_server_snapshot(
             plugins_changed(last_plugins, check.plugins),
             mods_changed(last_mods, check.mods),
         )
+    )
+
+
+def extract_entities_from_checks(
+    checks: list[ServerCheckSchema],
+) -> ExtractedEntitiesSchema:
+    softwares: list[SoftwareSchema] = []
+    plugins: list[PluginSchema] = []
+    mods: list[ModSchema] = []
+    players: list[PlayerSchema] = []
+
+    for check in checks:
+        softwares.append(check.software)
+        plugins.extend(check.plugins)
+        mods.extend(check.mods)
+        players.extend(check.players.keys())
+
+    return ExtractedEntitiesSchema(
+        softwares=softwares,
+        plugins=plugins,
+        mods=mods,
+        players=players,
     )
