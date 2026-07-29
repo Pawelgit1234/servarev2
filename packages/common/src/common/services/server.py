@@ -28,17 +28,192 @@ from common.utils import (
     need_create_server_snapshot,
     player_snapshot_changed,
 )
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, contains_eager, selectinload
 
 
-async def get_ip(db: AsyncSession, ip: str) -> IpModel | None:
-    return await db.scalar(  # type: ignore
-        select(IpModel)
-        .where(IpModel.ip == ip)
-        .options(selectinload(IpModel.servers), selectinload(IpModel.ports))
+def _build_ip_with_latest_relations_stmt(
+    ip_filter: ColumnElement[bool],
+) -> Select[tuple[IpModel]]:
+    latest_snapshot = (
+        select(ServerSnapshotModel)
+        .distinct(ServerSnapshotModel.server_id)
+        .order_by(
+            ServerSnapshotModel.server_id,
+            ServerSnapshotModel.created_at.desc(),
+        )
+        .subquery()
     )
+    latest_snapshot_alias = aliased(
+        ServerSnapshotModel,
+        latest_snapshot,
+    )
+
+    latest_dynamic_snapshot = (
+        select(ServerDynamicSnapshotModel)
+        .distinct(ServerDynamicSnapshotModel.server_id)
+        .order_by(
+            ServerDynamicSnapshotModel.server_id,
+            ServerDynamicSnapshotModel.created_at.desc(),
+        )
+        .subquery()
+    )
+    latest_dynamic_snapshot_alias = aliased(
+        ServerDynamicSnapshotModel,
+        latest_dynamic_snapshot,
+    )
+
+    latest_session = (
+        select(ServerSessionModel)
+        .distinct(ServerSessionModel.server_id)
+        .order_by(
+            ServerSessionModel.server_id,
+            ServerSessionModel.from_.desc(),
+        )
+        .subquery()
+    )
+    latest_session_alias = aliased(
+        ServerSessionModel,
+        latest_session,
+    )
+
+    latest_player_session = (
+        select(PlayerSessionModel)
+        .join(
+            PlayerModel,
+            PlayerModel.id == PlayerSessionModel.player_id,
+        )
+        .distinct(PlayerModel.uuid)
+        .order_by(
+            PlayerModel.uuid,
+            PlayerSessionModel.from_.desc(),
+        )
+        .subquery()
+    )
+    latest_player_session_alias = aliased(
+        PlayerSessionModel,
+        latest_player_session,
+    )
+
+    player_alias = aliased(PlayerModel)
+
+    latest_player_snapshot = (
+        select(PlayerSnapshotModel)
+        .distinct(PlayerSnapshotModel.player_id)
+        .order_by(
+            PlayerSnapshotModel.player_id,
+            PlayerSnapshotModel.created_at.desc(),
+        )
+        .subquery()
+    )
+    latest_player_snapshot_alias = aliased(
+        PlayerSnapshotModel,
+        latest_player_snapshot,
+    )
+
+    return (
+        select(IpModel)
+        .where(ip_filter)
+        .outerjoin(IpModel.servers)
+        .outerjoin(
+            latest_snapshot_alias,
+            latest_snapshot_alias.server_id == ServerModel.id,
+        )
+        .outerjoin(
+            latest_dynamic_snapshot_alias,
+            latest_dynamic_snapshot_alias.server_id == ServerModel.id,
+        )
+        .outerjoin(
+            latest_session_alias,
+            latest_session_alias.server_id == ServerModel.id,
+        )
+        .outerjoin(
+            latest_player_session_alias,
+            latest_player_session_alias.server_id == ServerModel.id,
+        )
+        .outerjoin(
+            player_alias,
+            player_alias.id == latest_player_session_alias.player_id,
+        )
+        .outerjoin(
+            latest_player_snapshot_alias,
+            latest_player_snapshot_alias.player_id == player_alias.id,
+        )
+        .options(
+            selectinload(IpModel.ports),
+            contains_eager(IpModel.servers),
+            contains_eager(
+                IpModel.servers,
+            )
+            .contains_eager(
+                ServerModel.snapshots,
+                alias=latest_snapshot_alias,
+            )
+            .selectinload(ServerSnapshotModel.software),
+            contains_eager(
+                IpModel.servers,
+            )
+            .contains_eager(
+                ServerModel.snapshots,
+                alias=latest_snapshot_alias,
+            )
+            .selectinload(
+                ServerSnapshotModel.plugin_associations,
+            )
+            .selectinload(
+                ServerSnapshotPluginAssociationModel.plugin,
+            ),
+            contains_eager(
+                IpModel.servers,
+            )
+            .contains_eager(
+                ServerModel.snapshots,
+                alias=latest_snapshot_alias,
+            )
+            .selectinload(
+                ServerSnapshotModel.mod_associations,
+            )
+            .selectinload(
+                ServerSnapshotModAssociationModel.mod,
+            ),
+            contains_eager(
+                IpModel.servers,
+            ).contains_eager(
+                ServerModel.dynamic_snapshots,
+                alias=latest_dynamic_snapshot_alias,
+            ),
+            contains_eager(
+                IpModel.servers,
+            ).contains_eager(
+                ServerModel.sessions,
+                alias=latest_session_alias,
+            ),
+            contains_eager(
+                IpModel.servers,
+            )
+            .contains_eager(
+                ServerModel.player_sessions,
+                alias=latest_player_session_alias,
+            )
+            .contains_eager(
+                PlayerSessionModel.player,
+                alias=player_alias,
+            )
+            .contains_eager(
+                PlayerModel.snapshots,
+                alias=latest_player_snapshot_alias,
+            ),
+        )
+    )
+
+
+async def get_ip(
+    db: AsyncSession,
+    ip: str,
+) -> IpModel | None:
+    stmt = _build_ip_with_latest_relations_stmt(IpModel.ip == ip)
+    return (await db.execute(stmt)).scalars().unique().one_or_none()
 
 
 def create_ip(db: AsyncSession, ip: IpSchema) -> IpModel:
