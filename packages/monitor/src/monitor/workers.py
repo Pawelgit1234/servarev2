@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from common.checks.player import fetch_player_snapshot
+from common.checks.player import fetch_premium_player_snapshot
 from common.databases import async_session
 from common.services.common import upload_players, upload_servers
 from common.services.entities import load_existing_entities
@@ -38,13 +38,13 @@ async def player_worker() -> None:
                 await asyncio.sleep(DB_RETRY_DELAY_SECONDS)  # type: ignore
                 continue
 
-            snapshot_schema = await fetch_player_snapshot(player.uuid)
+            snapshot_schema = await fetch_premium_player_snapshot(player.uuid)
             if snapshot_schema is None:
                 logger.warning("Unsuccessful player request")
                 continue
 
             normalize_player_snapshot(snapshot_schema)
-            await upload_players(snapshot_schema)
+            await upload_players([snapshot_schema])
 
             create_player_snapshot_if_changed(db, player, snapshot_schema)
             await db.commit()

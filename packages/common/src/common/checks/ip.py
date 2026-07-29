@@ -4,21 +4,23 @@ from aiohttp import ClientError
 from common.schemas.ip import IpInfoSchema
 from common.session import session_manager
 from common.settings import IPINFO_API_TOKEN, IPINFO_SEMAPHORE
+from common.utils import retry_on_none
 
 s = asyncio.Semaphore(IPINFO_SEMAPHORE)
 
 
-async def get_ip_info(ip: str) -> IpInfoSchema:
+@retry_on_none()  # type: ignore
+async def get_ip_info(ip: str) -> IpInfoSchema | None:
     url = f"https://ipinfo.io/{ip}/json?token={IPINFO_API_TOKEN}"
 
     try:
         async with s, session_manager.session.get(url) as resp:
             if resp.status != 200:
-                return IpInfoSchema()
+                return None
 
             data = await resp.json()
     except (TimeoutError, ClientError):
-        return IpInfoSchema()
+        return None
 
     loc = data.get("loc")
     lat, lon = (None, None)

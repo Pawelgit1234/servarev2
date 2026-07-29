@@ -8,6 +8,7 @@ from common.enums import PlayerType
 from common.schemas.player import PlayerSchema, PlayerSnapshotSchema
 from common.session import session_manager
 from common.settings import MOJANG_SEMAPHORE, SESSION_URL
+from common.utils import retry_on_none
 from mcstatus.responses import JavaStatusPlayer
 
 s = asyncio.Semaphore(MOJANG_SEMAPHORE)
@@ -33,7 +34,10 @@ def is_offline_uuid(name: str, u: str) -> bool:
     return str(expected) == str(uuid.UUID(u))
 
 
-async def fetch_player_snapshot(u: str) -> PlayerSnapshotSchema | None:
+@retry_on_none()  # type: ignore
+async def fetch_premium_player_snapshot(u: str) -> PlayerSnapshotSchema | None:
+    """Use only if you sure that this player exists in Mojang api"""
+
     try:
         async with (
             s,
@@ -55,8 +59,10 @@ async def fetch_player_snapshot(u: str) -> PlayerSnapshotSchema | None:
         value = properties[0].get("value")
         if value:
             decoded = json.loads(base64.b64decode(value))
-            skin = decoded["textures"].get("SKIN", {}).get("url")
-            cape = decoded["textures"].get("CAPE", {}).get("url")
+            textures = decoded.get("textures", {})
+
+            skin = textures.get("SKIN", {}).get("url")
+            cape = textures.get("CAPE", {}).get("url")
 
     return PlayerSnapshotSchema(
         name=name,
@@ -112,8 +118,10 @@ async def fetch_profile(
         value = properties[0].get("value")
         if value:
             decoded = json.loads(base64.b64decode(value))
-            skin = decoded["textures"].get("SKIN", {}).get("url")
-            cape = decoded["textures"].get("CAPE", {}).get("url")
+            textures = decoded.get("textures", {})
+
+            skin = textures.get("SKIN", {}).get("url")
+            cape = textures.get("CAPE", {}).get("url")
 
     return (
         PlayerSchema(uuid=u, player_type=PlayerType.PREMIUM),

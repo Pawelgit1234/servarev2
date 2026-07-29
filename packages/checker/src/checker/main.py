@@ -4,7 +4,7 @@ import logging
 from common.databases import engine, ra
 from common.logger import setup_logging
 from common.session import session_manager
-from common.settings import CHECKER_CONCURRENCY, REDIS_IP_QUEUE
+from common.settings import CHECKER_WORKERS, REDIS_IP_QUEUE
 
 from checker.handlers import handle_masscan, handle_porter
 
@@ -27,7 +27,7 @@ async def main() -> None:
     session_manager.init()
     workers = [
         worker()
-        for _ in range(CHECKER_CONCURRENCY)  # type: ignore
+        for _ in range(CHECKER_WORKERS)  # type: ignore
     ]
 
     try:

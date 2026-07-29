@@ -5,8 +5,8 @@ from common.databases import engine
 from common.logger import setup_logging
 from common.session import session_manager
 from common.settings import (
-    MONITOR_PLAYER_CONCURRENCY,
-    MONITOR_SERVER_CONCURRENCY,
+    MONITOR_PLAYER_WORKERS,
+    MONITOR_SERVER_WORKERS,
 )
 
 from monitor.workers import player_worker, server_worker
@@ -20,10 +20,10 @@ async def main() -> None:
     session_manager.init()
     workers = [
         server_worker()
-        for _ in range(MONITOR_SERVER_CONCURRENCY)  # type: ignore
+        for _ in range(MONITOR_SERVER_WORKERS)  # type: ignore
     ] + [
         player_worker()
-        for _ in range(MONITOR_PLAYER_CONCURRENCY)  # type: ignore
+        for _ in range(MONITOR_PLAYER_WORKERS)  # type: ignore
     ]
 
     try:

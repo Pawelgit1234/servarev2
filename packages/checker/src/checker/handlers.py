@@ -2,6 +2,7 @@ import logging
 
 from common.checks.ip import get_ip_info
 from common.databases import async_session, ra
+from common.schemas.ip import IpInfoSchema
 from common.services.common import upload_servers
 from common.services.entities import load_existing_entities
 from common.services.server import create_ip, get_ip
@@ -42,6 +43,10 @@ async def handle_masscan(address: str) -> None:
         ip = await get_ip(db, masscan.ip)
         if ip is None:
             ip_info = await get_ip_info(masscan.ip)
+            if ip_info is None:
+                logger.warning("Unsuccessful ip request")
+                ip_info = IpInfoSchema()
+
             ip_schema = ip_info_to_ip_schema(
                 ip_info, masscan.ip, masscan.is_multiport
             )

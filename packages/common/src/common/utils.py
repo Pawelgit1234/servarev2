@@ -1,5 +1,10 @@
+import asyncio
 import base64
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
+from functools import wraps
+from random import uniform
+from typing import ParamSpec, TypeVar
 
 from common.models.assets import ModModel, PluginModel, SoftwareModel
 from common.models.player import PlayerSnapshotModel
@@ -19,6 +24,9 @@ from common.schemas.server import (
     ServerSnapshotSchema,
 )
 from common.settings import (
+    API_BASE_DELAY_SECONDS,
+    API_MAX_ATTEMPTS,
+    API_MAX_DELAY_SECONDS,
     ASN_MAX,
     CITY_MAX,
     COUNTRY_MAX,
@@ -301,3 +309,38 @@ def extract_entities_from_checks(
         mods=mods,
         players=players,
     )
+
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+
+def retry_on_none(
+    max_attempts: int = API_MAX_ATTEMPTS,  # type: ignore
+    base_delay_seconds: int = API_BASE_DELAY_SECONDS,  # type: ignore
+    max_delay_seconds: int = API_MAX_DELAY_SECONDS,  # type: ignore
+) -> Callable[
+    [Callable[P, Awaitable[T | None]]], Callable[P, Awaitable[T | None]]
+]:
+    def decorator(
+        func: Callable[P, Awaitable[T | None]],
+    ) -> Callable[P, Awaitable[T | None]]:
+        @wraps(func)
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T | None:
+            for attempt in range(max_attempts):
+                result = await func(*args, **kwargs)
+
+                if result is not None:
+                    return result
+
+                delay_seconds = uniform(
+                    0, min(max_delay_seconds, base_delay_seconds * 2**attempt)
+                )
+
+                await asyncio.sleep(delay_seconds)
+
+            return None
+
+        return wrapper
+
+    return decorator
