@@ -1,10 +1,11 @@
 import asyncio
 import base64
+import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from functools import wraps
 from random import uniform
-from typing import ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 from common.models.assets import ModModel, PluginModel, SoftwareModel
 from common.models.player import PlayerSnapshotModel
@@ -41,7 +42,10 @@ from common.settings import (
     SERVER_VERSION_MAX,
     SOFTWARE_VERSION_MAX,
     USERNAME_MAX,
+    WORKER_RESTART_ON_FAILURE_DELAY,
 )
+
+logger = logging.getLogger(__name__)
 
 # def merge_server_check_with_ip_info(
 #     server: ServerCheckSchema, ip_info: IpInfoSchema
@@ -340,6 +344,34 @@ def retry_on_none(
                 await asyncio.sleep(delay_seconds)
 
             return None
+
+        return wrapper
+
+    return decorator
+
+
+def restart_on_failure(
+    name: str | Callable[..., str],
+    delay: float = WORKER_RESTART_ON_FAILURE_DELAY,  # type: ignore
+) -> Callable[[Callable[..., Awaitable[T]]], Callable[..., Awaitable[None]]]:
+    def decorator(
+        func: Callable[..., Awaitable[T]],
+    ) -> Callable[..., Awaitable[None]]:
+        @wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> None:
+            worker_name = name(*args, **kwargs) if callable(name) else name
+            while True:
+                try:
+                    logger.info("Starting worker %s", worker_name)
+                    await func(*args, **kwargs)
+                except asyncio.CancelledError:
+                    logger.info("Worker %s cancelled", worker_name)
+                    raise
+                except Exception:
+                    logger.exception(
+                        "Worker %s crashed, restarting", worker_name
+                    )
+                    await asyncio.sleep(delay)
 
         return wrapper
 

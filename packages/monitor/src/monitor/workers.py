@@ -15,6 +15,7 @@ from common.utils import (
     extract_entities_from_checks,
     normalize_player_snapshot,
     normilize_ip,
+    restart_on_failure,
 )
 
 from monitor.checks import check_servers
@@ -28,7 +29,8 @@ from monitor.utils import log_servers_saved, normilize_server_checks
 logger = logging.getLogger(__name__)
 
 
-async def player_worker() -> None:
+@restart_on_failure(lambda worker_id: f"player-worker-{worker_id}")  # type: ignore
+async def player_worker(worker_id: int) -> None:
     while True:
         async with async_session() as db:  # type: ignore
             # get player
@@ -52,7 +54,8 @@ async def player_worker() -> None:
         logger.info(f"Player {player.uuid} was checked")
 
 
-async def server_worker() -> None:
+@restart_on_failure(lambda worker_id: f"server-worker-{worker_id}")  # type: ignore
+async def server_worker(worker_id: int) -> None:
     while True:
         async with async_session() as db:  # type: ignore
             # get ip

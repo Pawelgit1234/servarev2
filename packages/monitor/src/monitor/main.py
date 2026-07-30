@@ -19,11 +19,11 @@ async def main() -> None:
     logger.info("Starts running")
     session_manager.init()
     workers = [
-        server_worker()
-        for _ in range(MONITOR_SERVER_WORKERS)  # type: ignore
+        server_worker(i)
+        for i in range(MONITOR_SERVER_WORKERS)  # type: ignore
     ] + [
-        player_worker()
-        for _ in range(MONITOR_PLAYER_WORKERS)  # type: ignore
+        player_worker(i)
+        for i in range(MONITOR_PLAYER_WORKERS)  # type: ignore
     ]
 
     try:

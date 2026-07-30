@@ -80,6 +80,7 @@ S3_PUBLIC_READ_POLICY = {
 API_MAX_ATTEMPTS = get_int("API_MAX_ATTEMPTS")
 API_BASE_DELAY_SECONDS = get_int("API_BASE_DELAY_SECONDS")
 API_MAX_DELAY_SECONDS = get_int("API_MAX_DELAY_SECONDS")
+WORKER_RESTART_ON_FAILURE_DELAY = get_int("WORKER_RESTART_ON_FAILURE_DELAY")
 MOJANG_BULK_URL = "https://api.mojang.com/profiles/minecraft"
 SESSION_URL = "https://sessionserver.mojang.com/session/minecraft/profile"
 MOJANG_SEMAPHORE = 400 // 10  # max 400 requests per 10 seconds
