@@ -129,6 +129,7 @@ async def fetch_profile(
     )
 
 
+@retry_on_none()  # type: ignore
 async def download_by_url(url: str) -> bytes | None:
     try:
         async with s, session_manager.session.get(url) as resp:

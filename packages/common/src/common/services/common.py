@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections.abc import Callable, Iterable
 from typing import TypeVar
 
@@ -11,6 +12,8 @@ from common.schemas.server import ServerCheckSchema
 from common.settings import S3_CAPE_PREFIX, S3_ICON_PREFIX, S3_SKIN_PREFIX
 from common.utils import decode_base64
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 SchemaT = TypeVar("SchemaT")
 ModelT = TypeVar("ModelT")
@@ -100,6 +103,8 @@ async def prepare_assets(assets: list[PendingServerAssetSchema]) -> None:
 
 async def upload_asset(asset: PendingServerAssetSchema) -> None:
     if asset.data is None:
+        logger.warning(f"Asset data ({asset.field}) is None")
+        setattr(asset.owner, asset.field.value, None)
         return
 
     key = await s3.upload_bytes(
@@ -107,6 +112,7 @@ async def upload_asset(asset: PendingServerAssetSchema) -> None:
         object_name=None,
         prefix=asset.prefix,
         content_type=asset.content_type,
+        deduplicate=True,
     )
 
     setattr(asset.owner, asset.field.value, key)
