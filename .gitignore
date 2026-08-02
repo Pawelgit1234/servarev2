@@ -16,3 +16,4 @@ wheels/
 todo.txt
 .env
 paused.conf
+logs/

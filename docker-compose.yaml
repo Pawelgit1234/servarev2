@@ -11,6 +11,9 @@ services:
       - DB_NAME=${DB_NAME}
       - DB_HOST=localhost
       - DB_PORT=5432
+      - DB_POOL_SIZE=${DB_POOL_SIZE}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT}
       - MASSCAN_RATE=${MASSCAN_RATE}
       - REDIS_HOST=localhost
       - REDIS_PORT=6379
@@ -34,6 +37,9 @@ services:
       - DB_NAME=${DB_NAME}
       - DB_HOST=localhost
       - DB_PORT=5432
+      - DB_POOL_SIZE=${DB_POOL_SIZE}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT}
       - MASSCAN_RATE=${MASSCAN_RATE}
       - MASSCAN_RATE_TARGET=${MASSCAN_RATE_TARGET}
       - REDIS_HOST=localhost
@@ -59,6 +65,9 @@ services:
       - DB_NAME=${DB_NAME}
       - DB_HOST=db
       - DB_PORT=5432
+      - DB_POOL_SIZE=${DB_POOL_SIZE}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CHECKER_WORKERS=${CHECKER_WORKERS}
@@ -90,6 +99,9 @@ services:
       - DB_NAME=${DB_NAME}
       - DB_HOST=db
       - DB_PORT=5432
+      - DB_POOL_SIZE=${DB_POOL_SIZE}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - SERVER_CHECK_TIMEOUT=${SERVER_CHECK_TIMEOUT}
@@ -121,6 +133,9 @@ services:
       - DB_NAME=${DB_NAME}
       - DB_HOST=db
       - DB_PORT=5432
+      - DB_POOL_SIZE=${DB_POOL_SIZE}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT}
     volumes:
       - ./alembic:/app/alembic
     depends_on:
@@ -138,6 +153,9 @@ services:
       - REDIS_PORT=6379
       - DB_HOST=db_test
       - DB_PORT=5432
+      - DB_POOL_SIZE=${DB_POOL_SIZE}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT}
       - IP_CHECK_INTERVAL_DAYS=${IP_CHECK_INTERVAL_DAYS}
       - PORTER_CHECK_INTERVAL_DAYS=${PORTER_CHECK_INTERVAL_DAYS}
     profiles:

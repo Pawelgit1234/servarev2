@@ -28,14 +28,14 @@ logger = logging.getLogger(__name__)
 async def handle_masscan(address: str) -> None:
     masscan = parse_masscan_address(address)
 
-    async with async_session() as db:  # type: ignore
-        # Server check
-        check = await check_server_by_protocol(
-            masscan.protocol, masscan.ip, masscan.port
-        )
-        if check is None:
-            return
+    # Server check
+    check = await check_server_by_protocol(
+        masscan.protocol, masscan.ip, masscan.port
+    )
+    if check is None:
+        return
 
+    async with async_session() as db:  # type: ignore
         if await is_server_in_db(db, masscan.ip, masscan.port):
             return
 
@@ -66,7 +66,7 @@ async def handle_masscan(address: str) -> None:
     logger.info(f"New server: {ip.ip}:{check.server.port}")
 
     if not ip.is_multiport:
-        await ra.rpush(REDIS_PORTER_QUEUE, ip.ip)  # type: ignore
+        await ra.rpush(REDIS_PORTER_QUEUE, ip.ip)
 
 
 async def handle_porter(address: str) -> None:
@@ -86,10 +86,11 @@ async def handle_porter(address: str) -> None:
 
         for server in checks:
             normilize_server_check(server)
-
         await upload_servers(checks)
+        entities = extract_entities_from_checks(checks)
+        entity_maps = await load_existing_entities(db, entities)
 
-        await save_porter(db, defined_ports, checks, ip_model)
+        save_porter(db, defined_ports, checks, entity_maps, ip_model)
         await db.commit()
 
     logger.info(f"Ports and servers of {ip} were saved")

@@ -25,4 +25,4 @@ def log_servers_saved(ip: IpModel) -> None:
     log = f"Servers of {ip.ip} were checked: "
     for s in ip.servers:
         log += f"{s.port}, "
-    logger.info(log)
+    logger.info(log[:-2])  # remove the last comma

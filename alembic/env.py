@@ -8,7 +8,7 @@ from common.models.server import *
 from common.models.player import *
 from common.models.assets import *
 from common.base import Base
-from common.settings import DATABASE_URL
+from common.settings import DB_URL
 
 
 config = context.config
@@ -20,7 +20,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    url = DATABASE_URL.replace("postgresql+asyncpg", "postgresql+psycopg2")
+    url = DB_URL.replace("postgresql+asyncpg", "postgresql+psycopg2")
 
     context.configure(
         url=url,
@@ -36,7 +36,7 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     config.set_main_option(
         "sqlalchemy.url",
-        DATABASE_URL.replace("postgresql+asyncpg", "postgresql+psycopg2"),
+        DB_URL.replace("postgresql+asyncpg", "postgresql+psycopg2"),
     )
 
     connectable = engine_from_config(

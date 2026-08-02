@@ -18,9 +18,7 @@ from common.services.assets import (
     ensure_plugin,
     ensure_software,
 )
-from common.services.entities import load_existing_entities
 from common.services.server import handle_player_join, save_servers
-from common.utils import extract_entities_from_checks
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -135,31 +133,30 @@ def save_non_existing_servers(
     return server_models
 
 
-async def save_porter(
+def save_porter(
     db: AsyncSession,
     ports: list[IpPortSchema],
     checks: list[ServerCheckSchema],
+    entity_maps: ExistingEntityMapsSchema,
     ip: IpModel,
 ) -> None:
-    if checks:  # if not len(checks) == 0, save time by not loading entities
-        existing_servers_map = {s.port: s for s in ip.servers}
+    # servers
+    existing_servers_map = {s.port: s for s in ip.servers}
 
-        new_servers: list[ServerCheckSchema] = []
-        old_servers: list[tuple[ServerModel, ServerCheckSchema]] = []
+    new_servers: list[ServerCheckSchema] = []
+    old_servers: list[tuple[ServerModel, ServerCheckSchema]] = []
 
-        for check in checks:
-            server = existing_servers_map.get(check.server.port)
-            if server is None:
-                new_servers.append(check)
-            else:
-                old_servers.append((server, check))
+    for check in checks:
+        server = existing_servers_map.get(check.server.port)
+        if server is None:
+            new_servers.append(check)
+        else:
+            old_servers.append((server, check))
 
-        entities = extract_entities_from_checks(checks)
-        entity_maps = await load_existing_entities(db, entities)
+    save_non_existing_servers(db, new_servers, ip, entity_maps)
+    save_servers(db, old_servers, entity_maps)  # type: ignore
 
-        save_non_existing_servers(db, new_servers, ip, entity_maps)
-        save_servers(db, old_servers, entity_maps)  # type: ignore
-
+    # ports
     port_map = {
         (p.port, p.protocol_type, p.detected_service_type): p for p in ip.ports
     }

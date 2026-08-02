@@ -4,7 +4,7 @@ from common.databases import engine
 from common.models.assets import *  # noqa: F403
 from common.models.player import *  # noqa: F403
 from common.models.server import *  # noqa: F403
-from common.settings import DATABASE_URL
+from common.settings import DB_URL
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -25,7 +25,7 @@ async def migrate_db():  # type: ignore
 
 @pytest_asyncio.fixture(scope="function")
 async def db():  # type: ignore
-    engine = create_async_engine(DATABASE_URL)
+    engine = create_async_engine(DB_URL)
 
     connection = await engine.connect()
     transaction = await connection.begin()

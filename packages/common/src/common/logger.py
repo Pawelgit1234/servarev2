@@ -1,14 +1,13 @@
 import logging
 import sys
 
-FORMAT = "[%(asctime)s] [%(levelname)s] [%(name)s:%(lineno)d] %(message)s"
-DATEFMT = "%Y-%m-%d %H:%M:%S"
+from common.settings import LOG_DATEFMT, LOG_FORMAT
 
 
 def setup_logging(level: int = logging.INFO) -> None:
     logging.basicConfig(
         level=level,
-        format=FORMAT,
-        datefmt=DATEFMT,
+        format=LOG_FORMAT,
+        datefmt=LOG_DATEFMT,
         handlers=[logging.StreamHandler(sys.stdout)],
     )

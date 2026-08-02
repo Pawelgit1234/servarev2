@@ -8,10 +8,13 @@ def get_int(name: str) -> int | None:
     return env
 
 
-DATABASE_URL = (
+DB_URL = (
     f"postgresql+asyncpg://{os.getenv('DB_USERNAME')}:"
     f"{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
 )
+DB_POOL_SIZE = get_int("DB_POOL_SIZE")
+DB_MAX_OVERFLOW = get_int("DB_MAX_OVERFLOW")
+DB_POOL_TIMEOUT = get_int("DB_POOL_TIMEOUT")
 
 REDIS_HOST = os.getenv("REDIS_HOST")
 REDIS_PORT = os.getenv("REDIS_PORT")
@@ -85,3 +88,6 @@ MOJANG_BULK_URL = "https://api.mojang.com/profiles/minecraft"
 SESSION_URL = "https://sessionserver.mojang.com/session/minecraft/profile"
 MOJANG_SEMAPHORE = 400 // 10  # max 400 requests per 10 seconds
 IPINFO_SEMAPHORE = 8
+
+LOG_FORMAT = "[%(asctime)s] [%(levelname)s] [%(name)s:%(lineno)d] %(message)s"
+LOG_DATEFMT = "%Y-%m-%d %H:%M:%S"
