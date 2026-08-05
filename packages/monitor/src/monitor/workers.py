@@ -36,7 +36,7 @@ async def player_worker(worker_id: int) -> None:
             # get player
             player = await get_next_premium_player(db)
             if player is None:  # happens only if the database is empty
-                logger.warning("Database ist empty: no players")
+                logger.warning("Database is empty: no players")
                 await asyncio.sleep(DB_RETRY_DELAY_SECONDS)  # type: ignore
                 continue
 
@@ -61,7 +61,7 @@ async def server_worker(worker_id: int) -> None:
             # get ip
             ip = await get_next_ip(db)
             if ip is None:  # happens only if the database is empty
-                logger.warning("Database ist empty: no servers")
+                logger.warning("Database is empty: no servers")
                 await asyncio.sleep(DB_RETRY_DELAY_SECONDS)  # type: ignore
                 continue
 
