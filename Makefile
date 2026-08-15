@@ -16,6 +16,10 @@ migrate:
 upgrade:
 	docker compose run --rm --build migrator alembic upgrade head
 
+drizzle-pull:
+	docker compose run --rm bot npm run db:pull
+	docker compose stop db
+
 downgrade:
 	docker compose run --rm --build migrator alembic downgrade -1
 

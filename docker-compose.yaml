@@ -123,6 +123,33 @@ services:
       - db
       - migrator
   
+  bot:
+    build:
+      context: .
+      dockerfile: packages/bot/Dockerfile
+    container_name: bot
+    restart: no
+    environment:
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_POOL_SIZE=${DB_POOL_SIZE}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT}
+      - S3_PUBLIC_ENDPOINT=${S3_PUBLIC_ENDPOINT}
+      - S3_ROOT_USER=${S3_ROOT_USER}
+      - S3_ROOT_PASSWORD=${S3_ROOT_PASSWORD}
+      - BOT_WORKERS=${BOT_WORKERS}
+      - DB_RETRY_DELAY_SECONDS=${DB_RETRY_DELAY_SECONDS}
+    volumes:
+      - ./packages/bot:/app
+    depends_on:
+      - db
+      - migrator
+
+  
   migrator:
     build:
       context: .

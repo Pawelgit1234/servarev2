@@ -27,6 +27,7 @@ async def get_next_ip(
         .scalar_subquery()
     )
 
+    # TODO: update last_seen only after work is done
     updated_ip = (
         update(IpModel)
         .where(IpModel.id == locked_ip_subquery)
@@ -52,6 +53,7 @@ async def get_next_premium_player(db: AsyncSession) -> PlayerModel | None:
         .scalar_subquery()
     )
 
+    # TODO: update last_seen only after work is done
     updated_player = (
         update(PlayerModel)
         .where(PlayerModel.id == locked_player_subquery)

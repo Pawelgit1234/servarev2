@@ -99,6 +99,10 @@ class ServerModel(Base, TimestampMixin):  # type: ignore
         Enum(ServerType), nullable=False
     )
 
+    last_bot_check_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
     # relationships
     ip_id: Mapped[int] = mapped_column(
         ForeignKey("ips.id", ondelete="CASCADE"),

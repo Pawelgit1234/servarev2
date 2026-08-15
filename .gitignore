@@ -17,3 +17,4 @@ todo.txt
 .env
 paused.conf
 logs/
+node_modules/
