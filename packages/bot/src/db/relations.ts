@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { players, playerSnapshots, servers, serverBotSnapshots, serverDynamicSnapshots, serverSessions, serverSnapshots, softwares, playerSessions, ips, ipPorts, subchunks, serverBotSnapshotResourcePackAssociations, resourcePacks, mods, serverSnapshotModAssociations, plugins, serverSnapshotPluginAssociations, serverBotSnapshotModAssociations } from "./schema";
+import { players, playerSnapshots, servers, serverDynamicSnapshots, serverSessions, serverSnapshots, softwares, playerSessions, ips, ipPorts, serverBotSnapshots, serverBotSnapshotResourcePackAssociations, resourcePacks, mods, serverSnapshotModAssociations, plugins, serverSnapshotPluginAssociations } from "./schema";
 
 export const playerSnapshotsRelations = relations(playerSnapshots, ({one}) => ({
 	player: one(players, {
@@ -13,18 +13,14 @@ export const playersRelations = relations(players, ({many}) => ({
 	playerSessions: many(playerSessions),
 }));
 
-export const serverBotSnapshotsRelations = relations(serverBotSnapshots, ({one, many}) => ({
+export const serverDynamicSnapshotsRelations = relations(serverDynamicSnapshots, ({one}) => ({
 	server: one(servers, {
-		fields: [serverBotSnapshots.serverId],
+		fields: [serverDynamicSnapshots.serverId],
 		references: [servers.id]
 	}),
-	subchunks: many(subchunks),
-	serverBotSnapshotResourcePackAssociations: many(serverBotSnapshotResourcePackAssociations),
-	serverBotSnapshotModAssociations: many(serverBotSnapshotModAssociations),
 }));
 
 export const serversRelations = relations(servers, ({one, many}) => ({
-	serverBotSnapshots: many(serverBotSnapshots),
 	serverDynamicSnapshots: many(serverDynamicSnapshots),
 	serverSessions: many(serverSessions),
 	serverSnapshots: many(serverSnapshots),
@@ -33,13 +29,7 @@ export const serversRelations = relations(servers, ({one, many}) => ({
 		fields: [servers.ipId],
 		references: [ips.id]
 	}),
-}));
-
-export const serverDynamicSnapshotsRelations = relations(serverDynamicSnapshots, ({one}) => ({
-	server: one(servers, {
-		fields: [serverDynamicSnapshots.serverId],
-		references: [servers.id]
-	}),
+	serverBotSnapshots: many(serverBotSnapshots),
 }));
 
 export const serverSessionsRelations = relations(serverSessions, ({one}) => ({
@@ -89,11 +79,12 @@ export const ipsRelations = relations(ips, ({many}) => ({
 	servers: many(servers),
 }));
 
-export const subchunksRelations = relations(subchunks, ({one}) => ({
-	serverBotSnapshot: one(serverBotSnapshots, {
-		fields: [subchunks.botSnapshotId],
-		references: [serverBotSnapshots.id]
+export const serverBotSnapshotsRelations = relations(serverBotSnapshots, ({one, many}) => ({
+	server: one(servers, {
+		fields: [serverBotSnapshots.serverId],
+		references: [servers.id]
 	}),
+	serverBotSnapshotResourcePackAssociations: many(serverBotSnapshotResourcePackAssociations),
 }));
 
 export const serverBotSnapshotResourcePackAssociationsRelations = relations(serverBotSnapshotResourcePackAssociations, ({one}) => ({
@@ -124,7 +115,6 @@ export const serverSnapshotModAssociationsRelations = relations(serverSnapshotMo
 
 export const modsRelations = relations(mods, ({many}) => ({
 	serverSnapshotModAssociations: many(serverSnapshotModAssociations),
-	serverBotSnapshotModAssociations: many(serverBotSnapshotModAssociations),
 }));
 
 export const serverSnapshotPluginAssociationsRelations = relations(serverSnapshotPluginAssociations, ({one}) => ({
@@ -140,15 +130,4 @@ export const serverSnapshotPluginAssociationsRelations = relations(serverSnapsho
 
 export const pluginsRelations = relations(plugins, ({many}) => ({
 	serverSnapshotPluginAssociations: many(serverSnapshotPluginAssociations),
-}));
-
-export const serverBotSnapshotModAssociationsRelations = relations(serverBotSnapshotModAssociations, ({one}) => ({
-	serverBotSnapshot: one(serverBotSnapshots, {
-		fields: [serverBotSnapshotModAssociations.botSnapshotId],
-		references: [serverBotSnapshots.id]
-	}),
-	mod: one(mods, {
-		fields: [serverBotSnapshotModAssociations.modId],
-		references: [mods.id]
-	}),
 }));

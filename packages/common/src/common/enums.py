@@ -72,3 +72,17 @@ class ServerSoftwareType(Enum):
     MOHIST = "mohist"
     MAGMA = "magma"
     CATSERVER = "catserver"
+
+
+class GameModeType(Enum):
+    SURVIVAL = "survival"
+    CREATIVE = "creative"
+    ADVENTURE = "adventure"
+    SPECTATOR = "spectator"
+
+
+class DifficultyType(Enum):
+    PEACEFUL = "peaceful"
+    EASY = "easy"
+    NORMAL = "normal"
+    HARD = "hard"

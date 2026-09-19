@@ -143,8 +143,14 @@ services:
       - S3_ROOT_PASSWORD=${S3_ROOT_PASSWORD}
       - BOT_WORKERS=${BOT_WORKERS}
       - DB_RETRY_DELAY_SECONDS=${DB_RETRY_DELAY_SECONDS}
+      - BOT_IDLE_TIMEOUT=${BOT_IDLE_TIMEOUT}
+      - BOT_MAX_LIFETIME=${BOT_MAX_LIFETIME}
+      - BOT_NAME_PREFIX=${BOT_NAME_PREFIX}
+      - L4S_SERVER_IP=${L4S_SERVER_IP}
+      - BOT_SPAWN_MESSAGE=${BOT_SPAWN_MESSAGE}
     volumes:
       - ./packages/bot:/app
+      - /app/node_modules
     depends_on:
       - db
       - migrator

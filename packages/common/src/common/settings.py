@@ -61,12 +61,13 @@ IPINFO_API_TOKEN = os.getenv("IPINFO_API_TOKEN")
 
 S3_ROOT_USER = os.getenv("S3_ROOT_USER")
 S3_ROOT_PASSWORD = os.getenv("S3_ROOT_PASSWORD")
-S3_BUCKET = "assests"
+S3_BUCKET = "assets"
 S3_SKIN_PREFIX = "skins"
 S3_CAPE_PREFIX = "capes"
 S3_ICON_PREFIX = "icons"
-S3_SUBCHUNK_PREFIX = "subchunks"
+S3_WORLD_PREFIX = "world"
 S3_ENDPOINT = "http://minio:9000"
+S3_REGION_NAME = "us-east-1"
 S3_PUBLIC_ENDPOINT = os.getenv("S3_PUBLIC_ENDPOINT")
 S3_PUBLIC_READ_POLICY = {
     "Version": "2012-10-17",

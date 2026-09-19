@@ -144,13 +144,6 @@ class ModModel(Base, TimestampMixin):  # type: ignore
         cascade="all, delete-orphan",
     )
 
-    bot_snapshot_associations: Mapped[
-        list["ServerBotSnapshotModAssociationModel"]
-    ] = relationship(
-        back_populates="mod",
-        cascade="all, delete-orphan",
-    )
-
 
 class ServerSnapshotModAssociationModel(Base, TimestampMixin):  # type: ignore
     __tablename__ = "server_snapshot_mod_associations"
@@ -173,28 +166,4 @@ class ServerSnapshotModAssociationModel(Base, TimestampMixin):  # type: ignore
     )
     mod: Mapped["ModModel"] = relationship(
         back_populates="snapshot_associations",
-    )
-
-
-class ServerBotSnapshotModAssociationModel(Base, TimestampMixin):  # type: ignore
-    __tablename__ = "server_bot_snapshot_mod_associations"
-    __table_args__ = (
-        Index("ix_bot_mod_snapshot_id", "bot_snapshot_id"),
-        Index("ix_bot_mod_mod_id", "mod_id"),
-    )
-
-    bot_snapshot_id: Mapped[int] = mapped_column(
-        ForeignKey("server_bot_snapshots.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    bot_snapshot: Mapped["ServerBotSnapshotModel"] = relationship(
-        back_populates="mod_associations",
-    )
-
-    mod_id: Mapped[int] = mapped_column(
-        ForeignKey("mods.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    mod: Mapped["ModModel"] = relationship(
-        back_populates="bot_snapshot_associations",
     )

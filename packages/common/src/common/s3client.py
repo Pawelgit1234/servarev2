@@ -10,6 +10,7 @@ from common.settings import (
     S3_BUCKET,
     S3_ENDPOINT,
     S3_PUBLIC_READ_POLICY,
+    S3_REGION_NAME,
     S3_ROOT_PASSWORD,
     S3_ROOT_USER,
 )
@@ -22,12 +23,13 @@ class S3Client:
         secret_key: str,
         endpoint_url: str,
         bucket_name: str,
+        region_name: str,
     ):
         self.config = {
             "aws_access_key_id": access_key,
             "aws_secret_access_key": secret_key,
             "endpoint_url": endpoint_url,
-            "region_name": "us-east-1",
+            "region_name": region_name,
         }
 
         self.bucket_name = bucket_name
@@ -102,8 +104,9 @@ class S3Client:
 
 
 s3 = S3Client(
-    access_key=S3_ROOT_USER,  # type: ignore
-    secret_key=S3_ROOT_PASSWORD,  # type: ignore
+    access_key=S3_ROOT_USER,
+    secret_key=S3_ROOT_PASSWORD,
     endpoint_url=S3_ENDPOINT,
     bucket_name=S3_BUCKET,
+    region_name=S3_REGION_NAME,
 )

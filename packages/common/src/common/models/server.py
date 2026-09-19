@@ -2,7 +2,13 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from common.base import Base
-from common.enums import DetectedServiceType, ProtocolType, ServerType
+from common.enums import (
+    DetectedServiceType,
+    DifficultyType,
+    GameModeType,
+    ProtocolType,
+    ServerType,
+)
 from common.models.mixins import LastSeenMixin, TimestampMixin
 from common.settings import (
     ASN_MAX,
@@ -24,6 +30,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     desc,
     func,
 )
@@ -31,7 +38,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
     from common.models.assets import (
-        ServerBotSnapshotModAssociationModel,
         ServerBotSnapshotResourcePackAssociationModel,
         ServerSnapshotModAssociationModel,
         ServerSnapshotPluginAssociationModel,
@@ -294,6 +300,7 @@ class ServerDynamicSnapshotModel(Base, TimestampMixin):  # type: ignore
 
 class ServerBotSnapshotModel(Base, TimestampMixin):  # type: ignore
     __tablename__ = "server_bot_snapshots"
+
     __table_args__ = (
         Index(
             "ix_server_bot_snapshots_server_id_created_at",
@@ -309,13 +316,32 @@ class ServerBotSnapshotModel(Base, TimestampMixin):  # type: ignore
         nullable=False,
         index=True,
     )
+
     server: Mapped["ServerModel"] = relationship(
         back_populates="bot_snapshots"
     )
 
-    subchunks: Mapped[list["SubchunkModel"]] = relationship(
-        back_populates="bot_snapshot",
-        cascade="all, delete-orphan",
+    # world hash
+    hash: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    is_whitelisted: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    is_premium: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    is_hardcore: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
+    # TODO: Убрать и вместо этого сделать отдельную модель, что будет
+    # ServerModel many to one к Log4ShellModel
+    is_l4s: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
+    connection: Mapped[str | None] = mapped_column(Text, nullable=True)
+    signs: Mapped[str | None] = mapped_column(Text, nullable=True)
+    chat: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scoreboards: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    game_mode: Mapped[GameModeType | None] = mapped_column(
+        Enum(GameModeType), nullable=True
+    )
+    difficulty: Mapped[DifficultyType | None] = mapped_column(
+        Enum(DifficultyType), nullable=True
     )
 
     resource_pack_associations: Mapped[
@@ -324,25 +350,3 @@ class ServerBotSnapshotModel(Base, TimestampMixin):  # type: ignore
         back_populates="bot_snapshot",
         cascade="all, delete-orphan",
     )
-    mod_associations: Mapped[list["ServerBotSnapshotModAssociationModel"]] = (
-        relationship(
-            back_populates="bot_snapshot",
-            cascade="all, delete-orphan",
-        )
-    )
-
-
-class SubchunkModel(Base, TimestampMixin):  # type: ignore
-    __tablename__ = "subchunks"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    bot_snapshot_id: Mapped[int] = mapped_column(
-        ForeignKey("server_bot_snapshots.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    bot_snapshot: Mapped["ServerBotSnapshotModel"] = relationship(
-        back_populates="subchunks"
-    )
-
-    hash: Mapped[str] = mapped_column(String(32), index=True)

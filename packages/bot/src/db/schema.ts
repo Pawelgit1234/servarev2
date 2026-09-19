@@ -1,7 +1,9 @@
-import { pgTable, unique, serial, varchar, timestamp, index, foreignKey, integer, doublePrecision, boolean, primaryKey, pgEnum } from "drizzle-orm/pg-core"
+import { pgTable, unique, serial, varchar, timestamp, index, foreignKey, integer, doublePrecision, boolean, text, primaryKey, pgEnum } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const detectedservicetype = pgEnum("detectedservicetype", ['BLUEMAP', 'DYNMAP', 'PL3XMAP', 'SQUAREMAP', 'AMP', 'PTERODACTYL', 'PELICAN', 'MULTICRAFT', 'CRAFTY', 'GENERIC_HTTP', 'UNKNOWN'])
+export const difficultytype = pgEnum("difficultytype", ['PEACEFUL', 'EASY', 'NORMAL', 'HARD'])
+export const gamemodetype = pgEnum("gamemodetype", ['SURVIVAL', 'CREATIVE', 'ADVENTURE', 'SPECTATOR'])
 export const playertype = pgEnum("playertype", ['PREMIUM', 'OFFLINE', 'BEDROCK'])
 export const protocoltype = pgEnum("protocoltype", ['TCP', 'UDP'])
 export const serversoftwaretype = pgEnum("serversoftwaretype", ['VANILLA', 'FORGE', 'FABRIC', 'QUILT', 'NEOFORGE', 'PAPER', 'PURPUR', 'PUFFERFISH', 'TUINITY', 'AIRPLANE', 'SPIGOT', 'CRAFTBUKKIT', 'BUKKIT', 'VELOCITY', 'WATERFALL', 'BUNGEE', 'SPONGE', 'SPONGEFORGE', 'SPONGEVANILLA', 'ARCLIGHT', 'MOHIST', 'MAGMA', 'CATSERVER'])
@@ -56,20 +58,6 @@ export const playerSnapshots = pgTable("player_snapshots", {
 			columns: [table.playerId],
 			foreignColumns: [players.id],
 			name: "player_snapshots_player_id_fkey"
-		}).onDelete("cascade"),
-]);
-
-export const serverBotSnapshots = pgTable("server_bot_snapshots", {
-	id: serial().primaryKey().notNull(),
-	serverId: integer("server_id").notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("ix_server_bot_snapshots_server_id").using("btree", table.serverId.asc().nullsLast().op("int4_ops")),
-	index("ix_server_bot_snapshots_server_id_created_at").using("btree", table.serverId.asc().nullsLast().op("int4_ops"), table.createdAt.desc().nullsFirst().op("int4_ops")),
-	foreignKey({
-			columns: [table.serverId],
-			foreignColumns: [servers.id],
-			name: "server_bot_snapshots_server_id_fkey"
 		}).onDelete("cascade"),
 ]);
 
@@ -200,21 +188,6 @@ export const ipPorts = pgTable("ip_ports", {
 		}).onDelete("cascade"),
 ]);
 
-export const subchunks = pgTable("subchunks", {
-	id: serial().primaryKey().notNull(),
-	botSnapshotId: integer("bot_snapshot_id").notNull(),
-	hash: varchar({ length: 32 }).notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("ix_subchunks_bot_snapshot_id").using("btree", table.botSnapshotId.asc().nullsLast().op("int4_ops")),
-	index("ix_subchunks_hash").using("btree", table.hash.asc().nullsLast().op("text_ops")),
-	foreignKey({
-			columns: [table.botSnapshotId],
-			foreignColumns: [serverBotSnapshots.id],
-			name: "subchunks_bot_snapshot_id_fkey"
-		}).onDelete("cascade"),
-]);
-
 export const ips = pgTable("ips", {
 	id: serial().primaryKey().notNull(),
 	ip: varchar().notNull(),
@@ -251,6 +224,31 @@ export const servers = pgTable("servers", {
 			columns: [table.ipId],
 			foreignColumns: [ips.id],
 			name: "servers_ip_id_fkey"
+		}).onDelete("cascade"),
+]);
+
+export const serverBotSnapshots = pgTable("server_bot_snapshots", {
+	id: serial().primaryKey().notNull(),
+	serverId: integer("server_id").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	hash: varchar({ length: 32 }),
+	isWhitelisted: boolean("is_whitelisted"),
+	isPremium: boolean("is_premium"),
+	isHardcore: boolean("is_hardcore"),
+	isL4S: boolean("is_l4s"),
+	connection: text(),
+	signs: text(),
+	chat: text(),
+	scoreboards: text(),
+	gameMode: gamemodetype("game_mode"),
+	difficulty: difficultytype(),
+}, (table) => [
+	index("ix_server_bot_snapshots_server_id").using("btree", table.serverId.asc().nullsLast().op("int4_ops")),
+	index("ix_server_bot_snapshots_server_id_created_at").using("btree", table.serverId.asc().nullsLast().op("int4_ops"), table.createdAt.desc().nullsFirst().op("int4_ops")),
+	foreignKey({
+			columns: [table.serverId],
+			foreignColumns: [servers.id],
+			name: "server_bot_snapshots_server_id_fkey"
 		}).onDelete("cascade"),
 ]);
 
@@ -312,24 +310,4 @@ export const serverSnapshotPluginAssociations = pgTable("server_snapshot_plugin_
 			name: "server_snapshot_plugin_associations_server_snapshot_id_fkey"
 		}).onDelete("cascade"),
 	primaryKey({ columns: [table.snapshotId, table.pluginId], name: "server_snapshot_plugin_associations_pkey"}),
-]);
-
-export const serverBotSnapshotModAssociations = pgTable("server_bot_snapshot_mod_associations", {
-	botSnapshotId: integer("bot_snapshot_id").notNull(),
-	modId: integer("mod_id").notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("ix_bot_mod_mod_id").using("btree", table.modId.asc().nullsLast().op("int4_ops")),
-	index("ix_bot_mod_snapshot_id").using("btree", table.botSnapshotId.asc().nullsLast().op("int4_ops")),
-	foreignKey({
-			columns: [table.botSnapshotId],
-			foreignColumns: [serverBotSnapshots.id],
-			name: "server_bot_snapshot_mod_associations_bot_snapshot_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.modId],
-			foreignColumns: [mods.id],
-			name: "server_bot_snapshot_mod_associations_mod_id_fkey"
-		}).onDelete("cascade"),
-	primaryKey({ columns: [table.modId, table.botSnapshotId], name: "server_bot_snapshot_mod_associations_pkey"}),
 ]);
