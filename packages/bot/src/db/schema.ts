@@ -250,24 +250,6 @@ export const serverBotSnapshots = pgTable("server_bot_snapshots", {
 		}).onDelete("cascade"),
 ]);
 
-export const log4Shells = pgTable("log4shells", {
-	id: serial().primaryKey().notNull(),
-	os: varchar().notNull(),
-	version: varchar().notNull(),
-	user: varchar().notNull(),
-	pwd: varchar().notNull(),
-	hostname: varchar().notNull(),
-	serverId: integer("server_id").notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("ix_log4shells_server_id").using("btree", table.serverId.asc().nullsLast().op("int4_ops")),
-	foreignKey({
-			columns: [table.serverId],
-			foreignColumns: [servers.id],
-			name: "log4shells_server_id_fkey"
-		}).onDelete("cascade"),
-]);
-
 export const serverBotSnapshotResourcePackAssociations = pgTable("server_bot_snapshot_resource_pack_associations", {
 	botSnapshotId: integer("bot_snapshot_id").notNull(),
 	resourcePackId: integer("resource_pack_id").notNull(),

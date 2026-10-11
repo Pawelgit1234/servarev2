@@ -5,9 +5,6 @@ import { randomWord, sleep } from "./utils.js";
 import { Bot } from "./bots/bot.js";
 import { s3 } from "./s3client.js";
 
-// TODO: 1. todo.txt
-//       2. перенести ldap сервер
-
 async function runWorker(
   workerId: number,
   worker: () => Promise<void>,
@@ -45,9 +42,7 @@ async function worker(): Promise<void> {
       settings.BOT_NAME_LENGTH - settings.BOT_NAME_PREFIX.length,
     )}`;
 
-    // TODO: write into redis about l4s + expire
-
-    logger.info(`Join attempt [${username}]: ${ip.ip}:${server.port}`)
+    logger.info(`Join attempt [${username}]: ${ip.ip}:${server.port}`);
 
     const bot = new Bot(
       {
@@ -82,11 +77,10 @@ async function main(): Promise<void> {
   logger.info("Starts running");
 
   await Promise.all(
-    Array.from(
-      { length: settings.BOT_WORKERS },
-      (_, workerId) => runWorker(workerId, worker),
+    Array.from({ length: settings.BOT_WORKERS }, (_, workerId) =>
+      runWorker(workerId, worker),
     ),
   );
 }
 
-main()
+main();

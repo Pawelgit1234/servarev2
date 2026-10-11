@@ -146,7 +146,6 @@ services:
       - BOT_IDLE_TIMEOUT=${BOT_IDLE_TIMEOUT}
       - BOT_MAX_LIFETIME=${BOT_MAX_LIFETIME}
       - BOT_NAME_PREFIX=${BOT_NAME_PREFIX}
-      - L4S_SERVER_IP=${L4S_SERVER_IP}
       - BOT_SPAWN_MESSAGE=${BOT_SPAWN_MESSAGE}
       - WORKER_RESTART_ON_FAILURE_DELAY=${WORKER_RESTART_ON_FAILURE_DELAY}
       - BOT_CONNECT_TIMEOUT=${BOT_CONNECT_TIMEOUT}
@@ -157,27 +156,6 @@ services:
       - db
       - migrator
 
-  l4s:
-    build:
-      context: .
-      dockerfile: packages/l4s/Dockerfile
-    container_name: l4s
-    restart: no
-    environment:
-      - DB_USERNAME=${DB_USERNAME}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_POOL_SIZE=${DB_POOL_SIZE}
-      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}
-      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT}
-      - DB_RETRY_DELAY_SECONDS=${DB_RETRY_DELAY_SECONDS}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    depends_on:
-      - db
-      - migrator
   
   migrator:
     build:

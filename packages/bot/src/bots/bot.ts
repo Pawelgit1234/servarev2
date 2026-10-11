@@ -2,7 +2,6 @@ import mineflayer from "mineflayer";
 import { difficultytype, gamemodetype } from "../db/schema.js";
 import { settings } from "../settings.js";
 import {
-  determineL4sPotential,
   getSignText,
   joinOrNull,
   returnUnique,
@@ -17,7 +16,7 @@ export interface BotOptions {
   host: string;
   port: number;
   username: string;
-  closeTimeout?: number
+  closeTimeout?: number;
 }
 
 interface ResourcePackData {
@@ -121,7 +120,7 @@ export class Bot {
       const msg = `[kicked] ${JSON.stringify(reason)}`;
       this.connectionEvents.push(msg);
 
-      if (JSON.stringify(reason).includes("whitelist")) {
+      if (JSON.stringify(reason).includes("multiplayer.disconnect.unverified_username")) {
         this.setWhitelist(true);
       }
       logger.info(`${this.logString} ${msg}`);
@@ -223,17 +222,10 @@ export class Bot {
       this.isHardcore = this.bot.game.hardcore;
       this.setWhitelist(false);
 
-      // Log4Shell.
-      if (
-        determineL4sPotential(this.bot.version) === "potentially_vulnerable"
-      ) {
-        this.bot.chat(settings.L4S_MESSAGE);
-      }
-
       // Signs on older versions.
       const signIds = Object.values(this.bot.registry.blocksByName)
-      .filter((block) => block.name.includes("sign"))
-      .map((block) => block.id);
+        .filter((block) => block.name.includes("sign"))
+        .map((block) => block.id);
 
       const blocks = this.bot.findBlocks({
         matching: (block) => signIds.includes(block.type),
@@ -319,9 +311,9 @@ export class Bot {
         isHardcore: this.isHardcore,
 
         compressedWorld:
-        this.subChunks.length === 0
-          ? null
-          : await serializeWorld(this.subChunks),
+          this.subChunks.length === 0
+            ? null
+            : await serializeWorld(this.subChunks),
 
         gameMode: this.gameMode,
         difficulty: this.difficulty,
@@ -340,10 +332,10 @@ export class Bot {
     } catch (error) {
       logger.error(
         `${this.logString} Failed to finish bot: ${
-error instanceof Error
-? (error.stack ?? error.message)
-: String(error)
-}`,
+          error instanceof Error
+            ? (error.stack ?? error.message)
+            : String(error)
+        }`,
       );
 
       this.rejectCompletion(error);

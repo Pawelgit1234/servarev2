@@ -13,7 +13,6 @@ members = [
     "packages/monitor",
     "packages/porter",
     "packages/scanner",
-    "packages/l4s",
 ]
 
 [tool.uv.sources]

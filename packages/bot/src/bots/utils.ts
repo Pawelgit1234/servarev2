@@ -2,19 +2,6 @@ import { Buffer } from "node:buffer";
 import { compress } from "@mongodb-js/zstd";
 import type { SubChunk } from "./bot.js";
 
-export type L4S_POTENTIAL = "not_affected" | "potentially_vulnerable" | "fixed";
-
-export function determineL4sPotential(version: string): L4S_POTENTIAL {
-  const [major, minor, patch = 0] = version.split(".").map(Number);
-
-  if (major === 1 && minor! < 7) return "not_affected";
-  if (major === 1 && minor! === 18 && patch === 0)
-    return "potentially_vulnerable";
-  if (major === 1 && minor! < 18) return "potentially_vulnerable";
-
-  return "fixed";
-}
-
 export function collectStrings(value: unknown): string[] {
   if (typeof value === "string") return [value];
 

