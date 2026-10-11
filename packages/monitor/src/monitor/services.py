@@ -16,9 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, contains_eager
 
 
-async def get_next_ip(
-    db: AsyncSession,
-) -> IpModel | None:
+async def get_next_ip(db: AsyncSession) -> IpModel | None:
     locked_ip_subquery = (
         select(IpModel.id)
         .order_by(IpModel.last_seen_at.asc())

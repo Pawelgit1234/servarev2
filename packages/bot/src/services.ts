@@ -1,14 +1,8 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql, inArray } from "drizzle-orm";
 import { db } from "./db/database.js";
-import { ips, servers } from "./db/schema.js";
+import { ips, servers, resourcePacks, serverBotSnapshotResourcePackAssociations } from "./db/schema.js";
 import type { BotData } from "./bots/bot.js";
-
-// TODO: get_next_server()
-// server с самым старым last_bot_check_at -> IpModel => получается ip:port
-// нужна вся модел сервера, чтобы можно было удобно просто поверх навесить
-// нужные данные
-
-// TODO: проанализировать, как я делал это в monitor и checker
+import { serverBotSnapshots } from "./db/schema.js";
 
 export async function getNextServer() {
   return db.transaction(async (tx) => {
@@ -23,8 +17,91 @@ export async function getNextServer() {
       .limit(1)
       .for("update", { skipLocked: true });
 
+    if (result === undefined) {
+      return undefined;
+    }
+
+    // update lastBotCheckAt
+    await tx
+      .update(servers)
+      .set({ lastBotCheckAt: sql`now()` })
+      .where(eq(servers.id, result.server.id));
+
     return result;
   });
 }
 
-export async function saveBotData(botData: BotData) {}
+export async function saveBotData(
+  serverId: number,
+  worldHash: string | null,
+  botData: BotData,
+) {
+  return db.transaction(async (tx) => {
+    const [snapshot] = await tx
+      .insert(serverBotSnapshots)
+      .values({
+        serverId,
+        hash: worldHash,
+
+        isWhitelisted: botData.isWhitelisted,
+        isHardcore: botData.isHardcore,
+
+        connection: botData.connectionEvents,
+        signs: botData.signs,
+        chat: botData.chat,
+        scoreboards: botData.scoreboards,
+
+        gameMode: botData.gameMode,
+        difficulty: botData.difficulty,
+      })
+      .returning();
+
+    if (snapshot === undefined) {
+      throw new Error("Failed to create bot snapshot")
+    }
+
+    if (botData.resourcePacks.length === 0) {
+      return snapshot;
+    }
+
+    // Create existing resourcePacks
+    await tx
+      .insert(resourcePacks)
+      .values(
+        botData.resourcePacks.map((pack) => ({
+          url: pack.url,
+          hash: pack.hash ?? null,
+        })),
+      )
+      .onConflictDoNothing({
+        target: resourcePacks.url,
+      });
+
+    // Get packs
+    const packs = await tx
+      .select({
+        id: resourcePacks.id,
+        url: resourcePacks.url,
+      })
+      .from(resourcePacks)
+      .where(
+        inArray(
+          resourcePacks.url,
+          botData.resourcePacks.map((pack) => pack.url),
+        ),
+      );
+
+    // Associations
+    await tx
+      .insert(serverBotSnapshotResourcePackAssociations)
+      .values(
+        packs.map((pack) => ({
+          botSnapshotId: snapshot.id,
+          resourcePackId: pack.id,
+        })),
+      )
+      .onConflictDoNothing();
+
+    return snapshot;
+  });
+}

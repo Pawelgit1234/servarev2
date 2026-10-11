@@ -13,7 +13,7 @@ export const servertype = pgEnum("servertype", ['LEGACY', 'JAVA', 'BEDROCK'])
 export const resourcePacks = pgTable("resource_packs", {
 	id: serial().primaryKey().notNull(),
 	url: varchar({ length: 512 }).notNull(),
-	hash: varchar({ length: 64 }).notNull(),
+	hash: varchar({ length: 64 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	unique("resource_packs_url_key").on(table.url),
@@ -233,9 +233,7 @@ export const serverBotSnapshots = pgTable("server_bot_snapshots", {
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	hash: varchar({ length: 32 }),
 	isWhitelisted: boolean("is_whitelisted"),
-	isPremium: boolean("is_premium"),
 	isHardcore: boolean("is_hardcore"),
-	isL4S: boolean("is_l4s"),
 	connection: text(),
 	signs: text(),
 	chat: text(),
@@ -249,6 +247,24 @@ export const serverBotSnapshots = pgTable("server_bot_snapshots", {
 			columns: [table.serverId],
 			foreignColumns: [servers.id],
 			name: "server_bot_snapshots_server_id_fkey"
+		}).onDelete("cascade"),
+]);
+
+export const log4Shells = pgTable("log4shells", {
+	id: serial().primaryKey().notNull(),
+	os: varchar().notNull(),
+	version: varchar().notNull(),
+	user: varchar().notNull(),
+	pwd: varchar().notNull(),
+	hostname: varchar().notNull(),
+	serverId: integer("server_id").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("ix_log4shells_server_id").using("btree", table.serverId.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.serverId],
+			foreignColumns: [servers.id],
+			name: "log4shells_server_id_fkey"
 		}).onDelete("cascade"),
 ]);
 

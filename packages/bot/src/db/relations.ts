@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { players, playerSnapshots, servers, serverDynamicSnapshots, serverSessions, serverSnapshots, softwares, playerSessions, ips, ipPorts, serverBotSnapshots, serverBotSnapshotResourcePackAssociations, resourcePacks, mods, serverSnapshotModAssociations, plugins, serverSnapshotPluginAssociations } from "./schema";
+import { players, playerSnapshots, servers, serverDynamicSnapshots, serverSessions, serverSnapshots, softwares, playerSessions, ips, ipPorts, serverBotSnapshots, log4Shells, serverBotSnapshotResourcePackAssociations, resourcePacks, mods, serverSnapshotModAssociations, plugins, serverSnapshotPluginAssociations } from "./schema";
 
 export const playerSnapshotsRelations = relations(playerSnapshots, ({one}) => ({
 	player: one(players, {
@@ -30,6 +30,7 @@ export const serversRelations = relations(servers, ({one, many}) => ({
 		references: [ips.id]
 	}),
 	serverBotSnapshots: many(serverBotSnapshots),
+	log4Shells: many(log4Shells),
 }));
 
 export const serverSessionsRelations = relations(serverSessions, ({one}) => ({
@@ -85,6 +86,13 @@ export const serverBotSnapshotsRelations = relations(serverBotSnapshots, ({one, 
 		references: [servers.id]
 	}),
 	serverBotSnapshotResourcePackAssociations: many(serverBotSnapshotResourcePackAssociations),
+}));
+
+export const log4ShellsRelations = relations(log4Shells, ({one}) => ({
+	server: one(servers, {
+		fields: [log4Shells.serverId],
+		references: [servers.id]
+	}),
 }));
 
 export const serverBotSnapshotResourcePackAssociationsRelations = relations(serverBotSnapshotResourcePackAssociations, ({one}) => ({

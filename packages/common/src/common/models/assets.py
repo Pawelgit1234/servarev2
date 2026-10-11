@@ -48,7 +48,7 @@ class ResourcePackModel(Base, TimestampMixin):  # type: ignore
     url: Mapped[str] = mapped_column(
         String(RESOURCE_PACK_URL_MAX), unique=True
     )
-    hash: Mapped[str] = mapped_column(String(64))
+    hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     bot_snapshot_associations: Mapped[
         list["ServerBotSnapshotResourcePackAssociationModel"]

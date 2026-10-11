@@ -10,9 +10,6 @@ import {
 } from "./utils.js";
 import { logger } from "../logger.js";
 
-// TODO: протести бота на своём сервер, если аренда мощного закончится,
-// думаю на слабом тоже пойдёт
-
 type DifficultyType = (typeof difficultytype.enumValues)[number];
 type GameModeType = (typeof gamemodetype.enumValues)[number];
 
@@ -20,6 +17,7 @@ export interface BotOptions {
   host: string;
   port: number;
   username: string;
+  closeTimeout?: number
 }
 
 interface ResourcePackData {
@@ -71,32 +69,67 @@ export class Bot {
   private gameMode: GameModeType | null = null;
   private difficulty: DifficultyType | null = null;
 
-  private idleTimeout?: NodeJS.Timeout;
-  private maxTimeout?: NodeJS.Timeout;
+  private idleTimeout?: NodeJS.Timeout | undefined;
+  private maxTimeout?: NodeJS.Timeout | undefined;
+  private connectTimeout: NodeJS.Timeout | undefined;
 
   private readonly callback: BotCallback;
 
   private finished = false;
 
+  private readonly completion: Promise<void>;
+  private resolveCompletion!: () => void;
+  private rejectCompletion!: (error: unknown) => void;
+
+  private readonly logString: string;
+
   constructor(options: BotOptions, callback: BotCallback) {
-    this.bot = mineflayer.createBot(options);
     this.callback = callback;
+    this.logString = `[${options.username}] [${options.host}:${options.port}]:`;
+
+    this.completion = new Promise<void>((resolve, reject) => {
+      this.resolveCompletion = resolve;
+      this.rejectCompletion = reject;
+    });
+
+    this.bot = mineflayer.createBot(options);
+
     this.registerEvents();
+
+    this.connectTimeout = setTimeout(() => {
+      const msg = `[error] Connection timeout after ${settings.BOT_CONNECT_TIMEOUT}ms`;
+      logger.warn(`${this.logString} ${msg}`);
+
+      this.quit();
+    }, settings.BOT_CONNECT_TIMEOUT);
+  }
+
+  // Wait until the bot has completely finished its work,
+  // including the callback (S3 upload, database save, etc.).
+  public async wait(): Promise<void> {
+    return this.completion;
   }
 
   private registerEvents(): void {
     this.bot.on("error", (error) => {
-      this.connectionEvents.push(`[error] ${error.name}: ${error.message}`);
+      const msg = `[error] ${error.name}: ${error.message}`;
+      this.connectionEvents.push(msg);
+      logger.info(`${this.logString} ${msg}`);
     });
 
     this.bot.on("kicked", (reason) => {
-      this.connectionEvents.push(`[kicked] ${JSON.stringify(reason)}`);
+      const msg = `[kicked] ${JSON.stringify(reason)}`;
+      this.connectionEvents.push(msg);
 
-      if (JSON.stringify(reason).includes("whitelist")) this.setWhitelist(true);
+      if (JSON.stringify(reason).includes("whitelist")) {
+        this.setWhitelist(true);
+      }
+      logger.info(`${this.logString} ${msg}`);
     });
 
     this.bot.once("end", async () => {
       await this.finish();
+      logger.info(`${this.logString} end`);
     });
 
     this.bot.on("chunkColumnLoad", (point) => {
@@ -108,11 +141,9 @@ export class Bot {
         for (let i = -4; i < 20; i++) {
           const section = chunk.getSectionAtIndex(i);
 
-          if (
-            section === null || // only air
-            section === undefined // older worlds
-          )
+          if (section === null || section === undefined) {
             continue;
+          }
 
           this.subChunks.push({
             x: point.x / 16,
@@ -124,7 +155,7 @@ export class Bot {
           });
         }
       } catch (e) {
-        logger.warn(`Chunk loading Error ${e}`);
+        logger.warn(`${this.logString} Chunk loading Error ${e}`);
       }
     });
 
@@ -132,6 +163,7 @@ export class Bot {
       this.resetIdleTimeout();
 
       const items = scoreboard.items.join(",");
+
       this.scoreboards.push(
         `[${scoreboard.name}] ${scoreboard.title}: ${items}`,
       );
@@ -140,51 +172,68 @@ export class Bot {
     this.bot.on("resourcePack", (url, hash) => {
       this.resetIdleTimeout();
 
-      this.resourcePacks.push({ url: url, hash: hash });
+      this.resourcePacks.push({ url, hash });
     });
 
     this.bot.on("messagestr", (message, _) => {
       this.resetIdleTimeout();
 
       const time = new Date().toISOString().split("T")[1]!.split(".")[0];
+
       this.chatMessages.push(`[${time}] ${message}`);
     });
 
-    // get text of signs, works for some versions
+    // Get text of signs, works for some versions.
     this.bot._client.on("packet", (data, meta) => {
-      if (meta.name !== "map_chunk") return;
+      if (meta.name !== "map_chunk") {
+        return;
+      }
 
       this.resetIdleTimeout();
 
       data.blockEntities?.forEach((blockEntity: any) => {
-        if (blockEntity.nbtData === undefined) return;
+        if (blockEntity.nbtData === undefined) {
+          return;
+        }
 
         const text = getSignText(blockEntity.nbtData);
 
-        if (text !== "") this.signTexts.push(text);
+        if (text !== "") {
+          this.signTexts.push(text);
+        }
       });
     });
 
     this.bot.once("spawn", () => {
-      this.startTimeouts();
+      if (this.connectTimeout) {
+        clearTimeout(this.connectTimeout);
+        this.connectTimeout = undefined;
+      }
+
+      this.createTimeouts();
+
+      logger.info(`${this.logString} spawn`);
 
       this.bot.chat(settings.BOT_SPAWN_MESSAGE);
 
-      // normal data
+      // Normal data.
       this.gameMode = this.bot.game.gameMode.toUpperCase() as GameModeType;
       this.difficulty =
         this.bot.game.difficulty.toUpperCase() as DifficultyType;
       this.isHardcore = this.bot.game.hardcore;
       this.setWhitelist(false);
 
-      // log4shell
-      if (determineL4sPotential(this.bot.version) == "potentially_vulnerable")
+      // Log4Shell.
+      if (
+        determineL4sPotential(this.bot.version) === "potentially_vulnerable"
+      ) {
         this.bot.chat(settings.L4S_MESSAGE);
+      }
 
-      // signs on older versions
+      // Signs on older versions.
       const signIds = Object.values(this.bot.registry.blocksByName)
-        .filter((block) => block.name.includes("sign"))
-        .map((block) => block.id);
+      .filter((block) => block.name.includes("sign"))
+      .map((block) => block.id);
 
       const blocks = this.bot.findBlocks({
         matching: (block) => signIds.includes(block.type),
@@ -194,15 +243,21 @@ export class Bot {
 
       blocks.forEach((position) => {
         const block = this.bot.blockAt(position);
-        if (!block) return;
+
+        if (!block) {
+          return;
+        }
 
         const text = getSignText(block);
-        if (text !== "") this.signTexts.push(text);
+
+        if (text !== "") {
+          this.signTexts.push(text);
+        }
       });
     });
   }
 
-  private startTimeouts(): void {
+  private createTimeouts(): void {
     this.maxTimeout = setTimeout(() => {
       this.quit();
     }, settings.BOT_MAX_LIFETIME);
@@ -211,7 +266,9 @@ export class Bot {
   }
 
   private resetIdleTimeout(): void {
-    if (this.idleTimeout) clearTimeout(this.idleTimeout);
+    if (this.idleTimeout) {
+      clearTimeout(this.idleTimeout);
+    }
 
     this.idleTimeout = setTimeout(() => {
       this.quit();
@@ -219,19 +276,33 @@ export class Bot {
   }
 
   private clearTimeouts(): void {
-    if (this.idleTimeout) clearTimeout(this.idleTimeout);
-    if (this.maxTimeout) clearTimeout(this.maxTimeout);
+    if (this.connectTimeout) {
+      clearTimeout(this.connectTimeout);
+      this.connectTimeout = undefined;
+    }
+
+    if (this.idleTimeout) {
+      clearTimeout(this.idleTimeout);
+      this.idleTimeout = undefined;
+    }
+
+    if (this.maxTimeout) {
+      clearTimeout(this.maxTimeout);
+      this.maxTimeout = undefined;
+    }
   }
 
-  private setWhitelist(whitelist: boolean) {
-    if (this.isWhitelisted !== null) return;
+  private setWhitelist(whitelist: boolean): void {
+    if (this.isWhitelisted !== null) {
+      return;
+    }
 
     this.isWhitelisted = whitelist;
   }
 
   public quit(): void {
     this.clearTimeouts();
-    this.bot.quit();
+    this.bot.end();
   }
 
   private async finish(): Promise<void> {
@@ -240,24 +311,42 @@ export class Bot {
     this.finished = true;
     this.clearTimeouts();
 
-    await this.callback({
-      isWhitelisted: this.isWhitelisted,
-      isHardcore: this.isHardcore,
+    logger.info(`${this.logString} finish`);
 
-      compressedWorld:
+    try {
+      const botData: BotData = {
+        isWhitelisted: this.isWhitelisted,
+        isHardcore: this.isHardcore,
+
+        compressedWorld:
         this.subChunks.length === 0
           ? null
           : await serializeWorld(this.subChunks),
 
-      gameMode: this.gameMode,
-      difficulty: this.difficulty,
+        gameMode: this.gameMode,
+        difficulty: this.difficulty,
 
-      resourcePacks: this.resourcePacks,
+        resourcePacks: this.resourcePacks,
+        connectionEvents: joinOrNull(returnUnique(this.connectionEvents)),
+        signs: joinOrNull(returnUnique(this.signTexts)),
+        chat: joinOrNull(returnUnique(this.chatMessages)),
+        scoreboards: joinOrNull(returnUnique(this.scoreboards)),
+      };
 
-      connectionEvents: joinOrNull(returnUnique(this.connectionEvents)),
-      signs: joinOrNull(returnUnique(this.signTexts)),
-      chat: joinOrNull(returnUnique(this.chatMessages)),
-      scoreboards: joinOrNull(returnUnique(this.scoreboards)),
-    });
+      logger.info(`${this.logString} callback`);
+      await this.callback(botData);
+
+      this.resolveCompletion();
+    } catch (error) {
+      logger.error(
+        `${this.logString} Failed to finish bot: ${
+error instanceof Error
+? (error.stack ?? error.message)
+: String(error)
+}`,
+      );
+
+      this.rejectCompletion(error);
+    }
   }
 }

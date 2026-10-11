@@ -144,6 +144,31 @@ class ServerModel(Base, TimestampMixin):  # type: ignore
         cascade="all, delete-orphan",
         order_by="desc(PlayerSessionModel.from_)",
     )
+    log4shells: Mapped[list["Log4ShellModel"]] = relationship(
+        back_populates="server",
+        cascade="all, delete-orphan",
+    )
+
+
+class Log4ShellModel(Base, TimestampMixin):  # type: ignore
+    __tablename__ = "log4shells"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    os: Mapped[str] = mapped_column(String, nullable=False)
+    version: Mapped[str] = mapped_column(String, nullable=False)
+    user: Mapped[str] = mapped_column(String, nullable=False)
+    pwd: Mapped[str] = mapped_column(String, nullable=False)
+    hostname: Mapped[str] = mapped_column(String, nullable=False)
+
+    server_id: Mapped[int] = mapped_column(
+        ForeignKey("servers.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    server: Mapped["ServerModel"] = relationship(
+        back_populates="log4shells",
+    )
 
 
 class IpPortModel(Base, TimestampMixin):  # type: ignore
@@ -325,12 +350,7 @@ class ServerBotSnapshotModel(Base, TimestampMixin):  # type: ignore
     hash: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     is_whitelisted: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    is_premium: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     is_hardcore: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-
-    # TODO: Убрать и вместо этого сделать отдельную модель, что будет
-    # ServerModel many to one к Log4ShellModel
-    is_l4s: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     connection: Mapped[str | None] = mapped_column(Text, nullable=True)
     signs: Mapped[str | None] = mapped_column(Text, nullable=True)
